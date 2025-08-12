@@ -1,0 +1,9 @@
+{
+    "directory": "videos",
+    "rows": 2,
+    "clipsPerRow": 4,
+    "directories": [
+        "videos"
+    ],
+    "dashboardBackground": "assets/backgrounds/silver.jpg"
+}

@@ -1,0 +1,9 @@
+{
+    "default": {
+        "id": "default",
+        "name": "Default",
+        "rows": 2,
+        "clipsPerRow": 4,
+        "dashboardBackground": "assets/backgrounds/silver.jpg"
+    }
+}
