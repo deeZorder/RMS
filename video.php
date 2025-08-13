@@ -1,6 +1,6 @@
 <?php
 // video.php
-// Serves video files from any configured directory
+// Serves video files from any configured directory with Windows Server compatibility
 
 // Set unlimited execution time for video streaming
 @set_time_limit(0);
@@ -8,6 +8,10 @@
 
 // Increase memory limit for large video files
 @ini_set('memory_limit', '512M');
+
+// Windows Server specific settings
+@ini_set('output_buffering', 'Off');
+@ini_set('implicit_flush', 'On');
 
 // Load configuration
 $configPath = __DIR__ . '/config.json';
@@ -68,7 +72,7 @@ if (!file_exists($videoPath) || !is_file($videoPath)) {
 $fileSize = filesize($videoPath);
 $fileTime = filemtime($videoPath);
 
-// Set appropriate headers for video streaming
+// Enhanced MIME type detection for Windows Server
 $mimeType = 'application/octet-stream'; // Safe default
 $ext = strtolower(pathinfo($videoFile, PATHINFO_EXTENSION));
 switch ($ext) {
@@ -84,18 +88,60 @@ switch ($ext) {
     case 'mp4':
         $mimeType = 'video/mp4';
         break;
+    case 'avi':
+        $mimeType = 'video/x-msvideo';
+        break;
+    case 'wmv':
+        $mimeType = 'video/x-ms-wmv';
+        break;
+    case 'flv':
+        $mimeType = 'video/x-flv';
+        break;
+    case 'mkv':
+        $mimeType = 'video/x-matroska';
+        break;
 }
 
+// Windows Server specific headers
 header('Content-Type: ' . $mimeType);
 header('Content-Length: ' . $fileSize);
 header('Last-Modified: ' . gmdate('D, d M Y H:i:s', $fileTime) . ' GMT');
 header('Accept-Ranges: bytes');
 header('X-Content-Type-Options: nosniff');
-header('Cache-Control: public, max-age=604800, immutable');
+
+// Windows Server specific caching headers
+header('Cache-Control: no-cache, no-store, must-revalidate');
+header('Pragma: no-cache');
+header('Expires: 0');
+
+// Additional headers for better compatibility
+header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Methods: GET, HEAD, OPTIONS');
+header('Access-Control-Allow-Headers: Range, If-Range, If-Modified-Since, If-None-Match');
+
+// Handle preflight OPTIONS request
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(200);
+    exit;
+}
 
 // Function to check if connection is still alive
 function isConnectionAlive() {
     return !connection_aborted() && !connection_status();
+}
+
+// Function to safely output video data on Windows Server
+function safeOutput($data) {
+    if (ob_get_level()) {
+        ob_end_clean(); // Clear any output buffers
+    }
+    echo $data;
+    flush();
+    
+    // Windows Server specific flush
+    if (function_exists('fastcgi_finish_request')) {
+        fastcgi_finish_request();
+    }
 }
 
 // Handle range requests for video streaming
@@ -125,7 +171,7 @@ if ($range) {
         }
         
         fseek($handle, $start);
-        $buffer = 1024 * 256; // 256KB chunks for better throughput
+        $buffer = 1024 * 64; // Smaller buffer for Windows Server (64KB)
         $bytesSent = 0;
         
         while (!feof($handle) && isConnectionAlive()) {
@@ -137,17 +183,11 @@ if ($range) {
             
             if ($data === false) { break; }
             
-            echo $data;
+            safeOutput($data);
             $bytesSent += strlen($data);
             
-            // Flush output buffer to prevent memory buildup
-            if (ob_get_level()) {
-                ob_flush();
-            }
-            flush();
-            
-            // Small delay to prevent overwhelming the connection
-            usleep(1000); // 1ms
+            // Windows Server specific delay
+            usleep(500); // 0.5ms delay for Windows Server
         }
         fclose($handle);
         exit;
@@ -155,10 +195,10 @@ if ($range) {
 }
 
 // Serve the entire file
-// Stream in chunks to reduce memory usage
+// Stream in chunks optimized for Windows Server
 $handle = fopen($videoPath, 'rb');
 if ($handle) {
-    $buffer = 1024 * 256; // 256KB chunks
+    $buffer = 1024 * 64; // Smaller buffer for Windows Server (64KB)
     $bytesSent = 0;
     
     while (!feof($handle) && isConnectionAlive()) {
@@ -166,21 +206,19 @@ if ($handle) {
         
         if ($data === false) { break; }
         
-        echo $data;
+        safeOutput($data);
         $bytesSent += strlen($data);
         
-        // Flush output buffer to prevent memory buildup
-        if (ob_get_level()) {
-            ob_flush();
-        }
-        flush();
-        
-        // Small delay to prevent overwhelming the connection
-        usleep(1000); // 1ms
+        // Windows Server specific delay
+        usleep(500); // 0.5ms delay for Windows Server
     }
     fclose($handle);
 } else {
     // Fallback to readfile if fopen fails
+    if (ob_get_level()) {
+        ob_end_clean();
+    }
     readfile($videoPath);
+    flush();
 }
 ?> 

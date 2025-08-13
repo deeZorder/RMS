@@ -667,6 +667,12 @@ switch ($action) {
         $batch = max(1, min(50, (int)($_GET['batch'] ?? 10)));
         $adminCachePath = $baseDir . '/data/admin_cache.json';
         $thumbDir = $baseDir . '/data/thumbs';
+        
+        // Ensure thumbs directory exists
+        if (!is_dir($thumbDir)) {
+            @mkdir($thumbDir, 0777, true);
+        }
+        
         // Ensure we have the latest configured directories available for path reconstruction
         $config = file_exists($configPath) ? (json_decode(@file_get_contents($configPath), true) ?: []) : [];
         $all = [];
@@ -676,13 +682,17 @@ switch ($action) {
                 $all = $cache['all_video_files'];
             }
         }
+        
         $total = count($all);
         if ($total === 0) {
-            echo json_encode(['total' => 0, 'processed' => 0, 'remaining' => 0, 'nextOffset' => $offset]);
+            echo json_encode(['status' => 'ok', 'total' => 0, 'processed' => 0, 'failed' => 0, 'remaining' => 0, 'nextOffset' => $offset]);
             break;
         }
+        
         $end = min($total, $offset + $batch);
         $processed = 0;
+        $failed = 0;
+        
         for ($i = $offset; $i < $end; $i++) {
             $entry = $all[$i];
             $videoPath = '';
@@ -697,13 +707,104 @@ switch ($action) {
                     $videoPath = rtrim($dirs[$di], '\\/') . $sep . (string)($entry['name'] ?? '');
                 }
             }
-            if ($videoPath !== '') {
-                ensureVideoThumbnail($videoPath, $thumbDir);
+            
+            if ($videoPath !== '' && is_file($videoPath)) {
+                // Try to generate thumbnail using the same logic as thumb.php
+                $mtime = @filemtime($videoPath) ?: 0;
+                $hash = sha1($videoPath . '|' . $mtime);
+                $thumbPath = rtrim($thumbDir, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . $hash . '.jpg';
+                
+                if (is_file($thumbPath)) {
+                    $processed++; // Already exists
+                } else {
+                    // Check ffmpeg availability
+                    $which = (stripos(PHP_OS, 'WIN') === 0) ? 'where' : 'which';
+                    $cmdCheck = $which . ' ffmpeg' . (stripos(PHP_OS, 'WIN') === 0 ? ' 2> NUL' : ' 2> /dev/null');
+                    @exec($cmdCheck, $out, $code);
+                    
+                    if ($code === 0) {
+                        $escapedIn = escapeshellarg($videoPath);
+                        $escapedOut = escapeshellarg($thumbPath);
+                        $cmd = 'ffmpeg -ss 1 -i ' . $escapedIn . ' -frames:v 1 -vf "scale=480:-1" -q:v 5 -y ' . $escapedOut . (stripos(PHP_OS, 'WIN') === 0 ? ' 2> NUL' : ' 2> /dev/null');
+                        @exec($cmd, $o, $c);
+                        if ($c === 0 && is_file($thumbPath)) {
+                            $processed++;
+                        } else {
+                            $failed++;
+                        }
+                    } else {
+                        $failed++;
+                    }
+                }
+            } else {
+                $failed++;
             }
-            $processed++;
         }
+        
         $remaining = max(0, $total - $end);
-        echo json_encode(['total' => $total, 'processed' => $processed, 'remaining' => $remaining, 'nextOffset' => $end]);
+        echo json_encode([
+            'status' => 'ok',
+            'total' => $total, 
+            'processed' => $processed, 
+            'failed' => $failed,
+            'remaining' => $remaining, 
+            'nextOffset' => $end
+        ]);
+        break;
+    case 'check_ffmpeg':
+        // Check if FFmpeg is available and working
+        $which = (stripos(PHP_OS, 'WIN') === 0) ? 'where' : 'which';
+        $cmdCheck = $which . ' ffmpeg' . (stripos(PHP_OS, 'WIN') === 0 ? ' 2> NUL' : ' 2> /dev/null');
+        @exec($cmdCheck, $out, $code);
+        
+        if ($code === 0) {
+            // Test FFmpeg with a simple command
+            $testCmd = 'ffmpeg -version' . (stripos(PHP_OS, 'WIN') === 0 ? ' 2> NUL' : ' 2> /dev/null');
+            @exec($testCmd, $versionOut, $versionCode);
+            
+            if ($versionCode === 0) {
+                echo json_encode(['available' => true, 'version' => trim($versionOut[0] ?? 'Unknown')]);
+            } else {
+                echo json_encode(['available' => false, 'error' => 'FFmpeg found but failed to execute version command']);
+            }
+        } else {
+            echo json_encode(['available' => false, 'error' => 'FFmpeg not found in system PATH']);
+        }
+        break;
+    case 'get_video_count':
+        // Get total count of videos across all configured directories
+        $config = file_exists($configPath) ? (json_decode(@file_get_contents($configPath), true) ?: []) : [];
+        $dirs = getConfiguredDirectories($config, $baseDir);
+        $allowedExt = ['mp4', 'webm', 'ogg', 'mov', 'avi', 'mkv'];
+        $totalCount = 0;
+        
+        foreach ($dirs as $dir) {
+            if (!is_dir($dir)) {
+                // Try relative path if absolute doesn't exist
+                $relativePath = realpath($baseDir . '/' . $dir);
+                if ($relativePath && is_dir($relativePath)) {
+                    $dir = $relativePath;
+                } else {
+                    continue; // Skip invalid directories
+                }
+            }
+            
+            $allFiles = @scandir($dir);
+            if ($allFiles === false) continue;
+            
+            foreach ($allFiles as $file) {
+                if ($file !== '.' && $file !== '..' && is_file($dir . DIRECTORY_SEPARATOR . $file)) {
+                    $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
+                    if (in_array($ext, $allowedExt)) {
+                        $totalCount++;
+                    }
+                }
+                // Limit to prevent infinite loops on very large directories
+                if ($totalCount > 10000) break 2;
+            }
+        }
+        
+        echo json_encode(['count' => $totalCount]);
         break;
     case 'get_next_video':
         // Get the next video across all configured dirs, respecting saved order

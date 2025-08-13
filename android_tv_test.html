@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Android TV Video Test - Philips BDL5051T</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #1a1a1a;
+            color: #fff;
+        }
+        .test-container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .test-item {
+            background: #333;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            position: relative;
+            min-height: 250px;
+        }
+        .test-video {
+            width: 100%;
+            height: 200px;
+            background: #000;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            border: 2px solid #333;
+        }
+        .test-button {
+            background: #4ecdc4;
+            color: #000;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 16px;
+            font-weight: bold;
+        }
+        .test-button:hover {
+            background: #45b7aa;
+        }
+        .test-button.android-tv {
+            background: #ff6b35;
+        }
+        .log {
+            background: #000;
+            color: #0f0;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 14px;
+            max-height: 400px;
+            overflow-y: auto;
+            margin-top: 20px;
+            border: 1px solid #333;
+        }
+        .status {
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 16px;
+        }
+        .status.success { background: #4caf50; color: #000; }
+        .status.error { background: #f44336; color: #fff; }
+        .status.info { background: #2196f3; color: #fff; }
+        .status.android-tv { background: #ff6b35; color: #fff; }
+        
+        .device-info {
+            background: #2a2a2a;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 15px 0;
+            border-left: 4px solid #ff6b35;
+        }
+        
+        .video-debug {
+            background: #2a2a2a;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 15px 0;
+            border-left: 4px solid #4ecdc4;
+        }
+        
+        .force-visibility {
+            background: #2a2a2a;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 15px 0;
+            border-left: 4px solid #ffff00;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>Android TV Video Test - Philips BDL5051T</h1>
+        
+        <div class="test-item">
+            <h3>Test Video Element</h3>
+            <video class="test-video" id="testVideo" muted playsinline webkit-playsinline>
+                <source src="video_xampp.php?file=Magical Rainforest.mp4&dirIndex=0" type="video/mp4">
+                Your browser does not support the video tag.
+            </video>
+            
+            <div>
+                <button class="test-button" onclick="testPlay()">Test Play</button>
+                <button class="test-button" onclick="testPause()">Test Pause</button>
+                <button class="test-button" onclick="testLoad()">Test Load</button>
+                <button class="test-button android-tv" onclick="forceAndroidTVVisibility()">Force Android TV Visibility</button>
+                <button class="test-button" onclick="testVideoSource()">Test Video Source</button>
+                <button class="test-button" onclick="clearLog()">Clear Log</button>
+            </div>
+            
+            <div id="status" class="status info">Ready for testing</div>
+        </div>
+        
+        <div class="test-item">
+            <h3>Device Information</h3>
+            <div id="deviceInfo" class="device-info"></div>
+        </div>
+        
+        <div class="test-item">
+            <h3>Video Debug Information</h3>
+            <div id="videoDebug" class="video-debug"></div>
+        </div>
+        
+        <div class="test-item">
+            <h3>Force Visibility Controls</h3>
+            <div class="force-visibility">
+                <button class="test-button" onclick="toggleVideoStyle('opacity')">Toggle Opacity</button>
+                <button class="test-button" onclick="toggleVideoStyle('visibility')">Toggle Visibility</button>
+                <button class="test-button" onclick="toggleVideoStyle('display')">Toggle Display</button>
+                <button class="test-button" onclick="toggleVideoStyle('zIndex')">Toggle Z-Index</button>
+                <button class="test-button" onclick="resetVideoStyles()">Reset All Styles</button>
+            </div>
+        </div>
+        
+        <div class="test-item">
+            <h3>Test Log</h3>
+            <div id="log" class="log"></div>
+        </div>
+    </div>
+
+    <script>
+        const video = document.getElementById('testVideo');
+        const status = document.getElementById('status');
+        const log = document.getElementById('log');
+        const deviceInfo = document.getElementById('deviceInfo');
+        const videoDebug = document.getElementById('videoDebug');
+        
+        let styleToggleState = {
+            opacity: true,
+            visibility: true,
+            display: true,
+            zIndex: true
+        };
+        
+        // Log browser information
+        function logDeviceInfo() {
+            const info = {
+                userAgent: navigator.userAgent,
+                platform: navigator.platform,
+                vendor: navigator.vendor,
+                cookieEnabled: navigator.cookieEnabled,
+                onLine: navigator.onLine,
+                language: navigator.language,
+                languages: navigator.languages,
+                hardwareConcurrency: navigator.hardwareConcurrency,
+                maxTouchPoints: navigator.maxTouchPoints,
+                mediaCapabilities: navigator.mediaCapabilities ? 'Available' : 'Not Available',
+                deviceMemory: navigator.deviceMemory || 'Not Available',
+                connection: navigator.connection ? navigator.connection.effectiveType : 'Not Available',
+                isAndroidTV: navigator.userAgent.includes('Android') && navigator.userAgent.includes('Chrome'),
+                isPhilipsBDL: navigator.userAgent.includes('philips bdl5051t')
+            };
+            
+            deviceInfo.innerHTML = Object.entries(info)
+                .map(([key, value]) => `<strong>${key}:</strong> ${value}`)
+                .join('<br>');
+        }
+        
+        // Update video debug info
+        function updateVideoDebug() {
+            const debug = {
+                readyState: video.readyState,
+                networkState: video.networkState,
+                currentTime: video.currentTime,
+                duration: video.duration,
+                paused: video.paused,
+                ended: video.ended,
+                muted: video.muted,
+                volume: video.volume,
+                playsInline: video.playsInline,
+                autoplay: video.autoplay,
+                loop: video.loop,
+                preload: video.preload,
+                src: video.src,
+                currentSrc: video.currentSrc,
+                error: video.error ? video.error.message : 'None',
+                style: {
+                    opacity: video.style.opacity,
+                    visibility: video.style.visibility,
+                    display: video.style.display,
+                    zIndex: video.style.zIndex,
+                    position: video.style.position,
+                    transform: video.style.transform
+                }
+            };
+            
+            videoDebug.innerHTML = Object.entries(debug)
+                .map(([key, value]) => {
+                    if (typeof value === 'object') {
+                        return `<strong>${key}:</strong><br>` + 
+                               Object.entries(value)
+                                   .map(([k, v]) => `&nbsp;&nbsp;${k}: ${v}`)
+                                   .join('<br>');
+                    }
+                    return `<strong>${key}:</strong> ${value}`;
+                })
+                .join('<br>');
+        }
+        
+        // Log function
+        function logMessage(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = document.createElement('div');
+            logEntry.innerHTML = `[${timestamp}] ${message}`;
+            logEntry.style.color = type === 'error' ? '#ff6b6b' : type === 'success' ? '#51cf66' : '#74c0fc';
+            log.appendChild(logEntry);
+            log.scrollTop = log.scrollHeight;
+        }
+        
+        // Clear log
+        function clearLog() {
+            log.innerHTML = '';
+        }
+        
+        // Force Android TV visibility
+        function forceAndroidTVVisibility() {
+            logMessage('Forcing Android TV visibility...', 'info');
+            
+            // Apply Android TV specific styles
+            video.style.opacity = '1';
+            video.style.visibility = 'visible';
+            video.style.display = 'block';
+            video.style.zIndex = '999';
+            video.style.position = 'relative';
+            video.style.transform = 'translateZ(0)';
+            video.style.webkitTransform = 'translateZ(0)';
+            video.style.backfaceVisibility = 'hidden';
+            video.style.webkitBackfaceVisibility = 'hidden';
+            video.style.background = '#000';
+            video.style.border = '4px solid #ffff00';
+            video.style.boxShadow = '0 0 20px rgba(255, 255, 0, 0.8)';
+            
+            logMessage('Android TV visibility styles applied', 'success');
+            updateVideoDebug();
+        }
+        
+        // Toggle video style properties
+        function toggleVideoStyle(property) {
+            const currentValue = video.style[property];
+            let newValue;
+            
+            switch(property) {
+                case 'opacity':
+                    newValue = styleToggleState.opacity ? '0' : '1';
+                    styleToggleState.opacity = !styleToggleState.opacity;
+                    break;
+                case 'visibility':
+                    newValue = styleToggleState.visibility ? 'hidden' : 'visible';
+                    styleToggleState.visibility = !styleToggleState.visibility;
+                    break;
+                case 'display':
+                    newValue = styleToggleState.display ? 'none' : 'block';
+                    styleToggleState.display = !styleToggleState.display;
+                    break;
+                case 'zIndex':
+                    newValue = styleToggleState.zIndex ? '0' : '999';
+                    styleToggleState.zIndex = !styleToggleState.zIndex;
+                    break;
+            }
+            
+            video.style[property] = newValue;
+            logMessage(`${property} toggled to: ${newValue}`, 'info');
+            updateVideoDebug();
+        }
+        
+        // Reset all video styles
+        function resetVideoStyles() {
+            video.style.opacity = '';
+            video.style.visibility = '';
+            video.style.display = '';
+            video.style.zIndex = '';
+            video.style.position = '';
+            video.style.transform = '';
+            video.style.webkitTransform = '';
+            video.style.backfaceVisibility = '';
+            video.style.webkitBackfaceVisibility = '';
+            video.style.background = '';
+            video.style.border = '';
+            video.style.boxShadow = '';
+            
+            styleToggleState = {
+                opacity: true,
+                visibility: true,
+                display: true,
+                zIndex: true
+            };
+            
+            logMessage('All video styles reset', 'info');
+            updateVideoDebug();
+        }
+        
+        // Test play function
+        function testPlay() {
+            logMessage('Attempting to play video...', 'info');
+            status.textContent = 'Testing play...';
+            status.className = 'status info';
+            
+            const playPromise = video.play();
+            if (playPromise !== undefined) {
+                playPromise.then(() => {
+                    logMessage('Video play() succeeded!', 'success');
+                    status.textContent = 'Play test: SUCCESS';
+                    status.className = 'status success';
+                    
+                    // Force Android TV visibility after successful play
+                    if (navigator.userAgent.includes('Android') && navigator.userAgent.includes('Chrome')) {
+                        setTimeout(() => {
+                            forceAndroidTVVisibility();
+                        }, 100);
+                    }
+                }).catch((err) => {
+                    logMessage(`Video play() failed: ${err.name} - ${err.message}`, 'error');
+                    status.textContent = `Play test: FAILED - ${err.name}`;
+                    status.className = 'status error';
+                });
+            } else {
+                logMessage('Video play() returned undefined (older browser)', 'error');
+                status.textContent = 'Play test: FAILED - Undefined return';
+                status.className = 'status error';
+            }
+            
+            updateVideoDebug();
+        }
+        
+        // Test pause function
+        function testPause() {
+            logMessage('Attempting to pause video...', 'info');
+            try {
+                video.pause();
+                logMessage('Video pause() succeeded!', 'success');
+                status.textContent = 'Pause test: SUCCESS';
+                status.className = 'status success';
+            } catch (err) {
+                logMessage(`Video pause() failed: ${err}`, 'error');
+                status.textContent = 'Pause test: FAILED';
+                status.className = 'status error';
+            }
+            updateVideoDebug();
+        }
+        
+        // Test load function
+        function testLoad() {
+            logMessage('Attempting to load video...', 'info');
+            try {
+                video.load();
+                logMessage('Video load() succeeded!', 'success');
+                status.textContent = 'Load test: SUCCESS';
+                status.className = 'status success';
+            } catch (err) {
+                logMessage(`Video load() failed: ${err}`, 'error');
+                status.textContent = 'Load test: FAILED';
+                status.className = 'status error';
+            }
+            updateVideoDebug();
+        }
+
+        // Test video source function
+        function testVideoSource() {
+            logMessage('Attempting to test video source...', 'info');
+            try {
+                const currentSrc = video.src;
+                const newSrc = currentSrc.replace('video_xampp.php', 'video_xampp.php?file=Magical Rainforest.mp4&dirIndex=0');
+                video.src = newSrc;
+                logMessage(`Video source changed to: ${newSrc}`, 'info');
+                status.textContent = 'Video Source Test: SUCCESS';
+                status.className = 'status success';
+            } catch (err) {
+                logMessage(`Video source test failed: ${err}`, 'error');
+                status.textContent = 'Video Source Test: FAILED';
+                status.className = 'status error';
+            }
+            updateVideoDebug();
+        }
+        
+        // Video event listeners for debugging
+        video.addEventListener('loadstart', () => {
+            logMessage('loadstart event fired');
+            updateVideoDebug();
+        });
+        video.addEventListener('durationchange', () => {
+            logMessage('durationchange event fired');
+            updateVideoDebug();
+        });
+        video.addEventListener('loadedmetadata', () => {
+            logMessage('loadedmetadata event fired');
+            updateVideoDebug();
+        });
+        video.addEventListener('loadeddata', () => {
+            logMessage('loadeddata event fired');
+            updateVideoDebug();
+        });
+        video.addEventListener('progress', () => {
+            logMessage('progress event fired');
+            updateVideoDebug();
+        });
+        video.addEventListener('canplay', () => {
+            logMessage('canplay event fired');
+            updateVideoDebug();
+        });
+        video.addEventListener('canplaythrough', () => {
+            logMessage('canplaythrough event fired');
+            updateVideoDebug();
+        });
+        video.addEventListener('play', () => {
+            logMessage('play event fired');
+            updateVideoDebug();
+        });
+        video.addEventListener('playing', () => {
+            logMessage('playing event fired - video should be visible now');
+            updateVideoDebug();
+        });
+        video.addEventListener('pause', () => {
+            logMessage('pause event fired');
+            updateVideoDebug();
+        });
+        video.addEventListener('ended', () => {
+            logMessage('ended event fired');
+            updateVideoDebug();
+        });
+        video.addEventListener('error', (e) => {
+            logMessage(`error event fired: ${video.error ? video.error.message : 'Unknown error'}`, 'error');
+            updateVideoDebug();
+        });
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            logDeviceInfo();
+            logMessage('Android TV test page loaded');
+            logMessage(`Video element readyState: ${video.readyState}`);
+            logMessage(`Video element networkState: ${video.networkState}`);
+            logMessage(`Video element muted: ${video.muted}`);
+            logMessage(`Video element playsInline: ${video.playsInline}`);
+            
+            // Check if this is Android TV
+            if (navigator.userAgent.includes('Android') && navigator.userAgent.includes('Chrome')) {
+                logMessage('Android TV detected - applying special handling', 'info');
+                status.textContent = 'Android TV Detected - Ready for testing';
+                status.className = 'status android-tv';
+                
+                // Apply Android TV specific attributes
+                video.setAttribute('android-keep-screen-on', 'true');
+                video.setAttribute('android-focusable', 'true');
+                video.setAttribute('android-focusable-in-touch-mode', 'true');
+            }
+            
+            updateVideoDebug();
+        });
+        
+        // Update debug info periodically
+        setInterval(updateVideoDebug, 1000);
+    </script>
+</body>
+</html>

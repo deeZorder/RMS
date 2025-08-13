@@ -487,21 +487,49 @@ if ($dashboardBg !== '') {
         }
 
         function startPreviewLoopForItem(item) {
+            console.log('startPreviewLoopForItem called with:', item);
             if (!item) return;
             if (currentPreviewEl === item) return; // already previewing this tile
             stopAllPreviews(); // hard stop any other previews before starting a new one
 
             // Ensure a <video> element exists for this tile (thumbnails are images by default)
             let v = item.querySelector('.lazy-video');
+            console.log('Existing video element:', v);
             if (!v) {
+                console.log('Creating new video element');
                 v = document.createElement('video');
                 v.className = 'lazy-video';
+                
+                // Standard attributes for video playback
                 v.setAttribute('muted', '');
                 v.setAttribute('playsinline', '');
                 v.setAttribute('webkit-playsinline', '');
                 v.setAttribute('x5-playsinline', '');
+                
+                // Tablet-specific attributes for better compatibility
+                v.setAttribute('x5-video-player-type', 'h5');
+                v.setAttribute('x5-video-player-fullscreen', 'false');
+                v.setAttribute('x5-video-orientation', 'portraint');
+                v.setAttribute('x5-video-same-origin', 'true');
+                
+                // iOS Safari specific attributes
+                v.setAttribute('webkit-playsinline', '');
+                v.setAttribute('playsinline', '');
+                
+                // Android TV specific attributes
+                v.setAttribute('android-keep-screen-on', 'true');
+                v.setAttribute('android-focusable', 'true');
+                v.setAttribute('android-focusable-in-touch-mode', 'true');
+                
+                // Force hardware acceleration and rendering
+                v.style.transform = 'translateZ(0)';
+                v.style.webkitTransform = 'translateZ(0)';
+                v.style.backfaceVisibility = 'hidden';
+                v.style.webkitBackfaceVisibility = 'hidden';
+                
                 v.preload = 'metadata';
-                v.autoplay = true;
+                v.autoplay = false; // Don't set autoplay initially to avoid browser blocking
+                
                 // Insert video before placeholder so it sits underneath the title bar but above the image
                 const placeholder = item.querySelector('.video-placeholder');
                 if (placeholder && placeholder.parentNode === item) {
@@ -509,20 +537,55 @@ if ($dashboardBg !== '') {
                 } else {
                     item.appendChild(v);
                 }
+                console.log('Video element inserted, placeholder:', placeholder);
+                
                 // When video loads, mark tile as loaded to fade placeholder
                 v.addEventListener('loadeddata', () => {
+                    console.log('Video loaded, adding loaded and previewing classes');
                     item.classList.add('loaded');
                     item.classList.add('previewing'); // hide thumbnail overlay
                 }, { once: true });
+                
+                // Add error event listener for debugging
+                v.addEventListener('error', (e) => {
+                    console.error('Video error event:', e);
+                    console.error('Video error details:', v.error);
+                });
+                
+                // Add loadstart event for debugging
+                v.addEventListener('loadstart', () => {
+                    console.log('Video loadstart event fired');
+                });
+                
+                // Add canplay event for debugging
+                v.addEventListener('canplay', () => {
+                    console.log('Video canplay event fired');
+                });
+                
+                // Add playing event for debugging
+                v.addEventListener('playing', () => {
+                    console.log('Video playing event fired - video should be visible now');
+                    // Force a repaint on Android TV
+                    v.style.display = 'none';
+                    v.offsetHeight; // Force reflow
+                    v.style.display = 'block';
+                });
             }
 
             // Build video URL from tile data attributes
             const filename = item.getAttribute('data-filename') || '';
             const dirIndex = item.getAttribute('data-dir-index') || '0';
-            const url = 'video.php?file=' + encodeURIComponent(filename) + '&dirIndex=' + encodeURIComponent(dirIndex) + '#t=0.1';
+            
+            // Use the XAMPP-optimized video endpoint for Apache compatibility
+            let url = 'video_xampp.php?file=' + encodeURIComponent(filename) + '&dirIndex=' + encodeURIComponent(dirIndex) + '#t=0.1';
+            
+            // Log the video URL being used
+            console.log('Setting video src to:', url);
+            console.log('Using XAMPP-optimized video endpoint for Apache compatibility');
+            
             if (v.src !== url) {
                 v.src = url;
-                try { v.load(); } catch {}
+                try { v.load(); } catch (e) { console.error('Video load() error:', e); }
             }
 
             // Configure preview loop ~0-5.8s
@@ -535,18 +598,86 @@ if ($dashboardBg !== '') {
             v.addEventListener('timeupdate', handler);
 
             const kick = () => {
+                console.log('Kicking video playback');
                 try { v.currentTime = Math.min(v.duration ? Math.min(0.05, v.duration - 0.05) : 0.05, 0.2); } catch {}
-                v.play().catch(() => {});
+                
+                // Try to play with comprehensive error handling
+                const playPromise = v.play();
+                if (playPromise !== undefined) {
+                    playPromise.then(() => {
+                        console.log('Video play() succeeded');
+                        // Force visibility on Android TV after successful play
+                        setTimeout(() => {
+                            v.style.opacity = '1';
+                            v.style.visibility = 'visible';
+                            v.style.display = 'block';
+                            console.log('Forced video visibility on Android TV');
+                        }, 100);
+                    }).catch((err) => {
+                        console.error('Video play() failed:', err);
+                        console.error('Error name:', err.name);
+                        console.error('Error message:', err.message);
+                        
+                        // Try alternative approaches for tablet browsers
+                        if (err.name === 'NotAllowedError') {
+                            console.log('Autoplay blocked, trying user interaction workaround');
+                            // Some tablets require user interaction before video can play
+                            // We'll try to play again after a short delay
+                            setTimeout(() => {
+                                v.play().catch((retryErr) => {
+                                    console.error('Retry play() failed:', retryErr);
+                                });
+                            }, 100);
+                        }
+                    });
+                }
             };
-            if (v.readyState >= 1) { kick(); }
+            
+            if (v.readyState >= 1) { 
+                console.log('Video ready, kicking immediately');
+                kick(); 
+            }
             else {
-                v.addEventListener('loadedmetadata', () => { kick(); }, { once: true });
+                console.log('Video not ready, waiting for loadedmetadata');
+                v.addEventListener('loadedmetadata', () => { 
+                    console.log('Video metadata loaded, kicking');
+                    kick(); 
+                }, { once: true });
+                
                 // Fallback timeout to force play attempt
-                setTimeout(() => { if (v.readyState < 1) { v.play().catch(()=>{}); } }, 150);
+                setTimeout(() => { 
+                    if (v.readyState < 1) { 
+                        console.log('Fallback timeout, attempting to play');
+                        v.play().catch((err) => {
+                            console.error('Fallback play failed:', err);
+                        }); 
+                    } 
+                }, 150);
             }
 
             currentPreviewEl = item;
             item.classList.add('previewing');
+            console.log('Preview started for item, classes:', item.className);
+            console.log('Video element:', v);
+            console.log('Video src:', v.src);
+            console.log('Video readyState:', v.readyState);
+            console.log('Video muted:', v.muted);
+            console.log('Video playsInline:', v.playsInline);
+            console.log('Item DOM structure:', item.innerHTML);
+            
+            // Log user agent for debugging tablet issues
+            console.log('User Agent:', navigator.userAgent);
+            console.log('Platform:', navigator.platform);
+            
+            // Android TV specific logging
+            if (navigator.userAgent.includes('Android') && navigator.userAgent.includes('Chrome')) {
+                console.log('Android TV detected - applying special rendering fixes');
+                // Force immediate visibility for Android TV
+                v.style.opacity = '1';
+                v.style.visibility = 'visible';
+                v.style.display = 'block';
+                v.style.zIndex = '999';
+            }
         }
         // Determine profile query to send to API
         function getProfileQuery() {
@@ -904,20 +1035,25 @@ if ($dashboardBg !== '') {
         // Add click event to each item to select video
             document.querySelectorAll('.carousel-item').forEach(item => {
             item.addEventListener('click', () => {
+                console.log('Carousel item clicked:', item);
                 // If this item is already selected, do nothing to avoid stopping playback
                 if (item.classList.contains('playing')) {
+                    console.log('Item already playing, ignoring click');
                     return;
                 }
 
                 const filename = item.getAttribute('data-filename');
                 const dirIndex = parseInt(item.getAttribute('data-dir-index') || '0', 10);
+                console.log('Selected video:', filename, 'dirIndex:', dirIndex);
                 // Highlight selected
                 document.querySelectorAll('.carousel-item.playing').forEach(el => el.classList.remove('playing'));
                 item.classList.add('playing');
                 // If not playing, show preview loop; otherwise, keep preview off
                 if (currentPlaybackState !== 'play') {
+                    console.log('Starting preview loop, currentPlaybackState:', currentPlaybackState);
                     startPreviewLoopForItem(item);
                 } else {
+                    console.log('Video is playing, stopping preview');
                     stopPreview();
                 }
                 // Send update to server

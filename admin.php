@@ -268,6 +268,99 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
+    // System action: generate thumbnails for all videos
+    if ($currentSection === 'generate-thumbnails') {
+        // Force a fresh scan by invalidating admin cache
+        if (file_exists($adminCachePath)) {
+            @unlink($adminCachePath);
+        }
+        
+        // Ensure thumbs directory exists
+        $thumbDir = __DIR__ . '/data/thumbs';
+        if (!is_dir($thumbDir)) {
+            @mkdir($thumbDir, 0777, true);
+        }
+        
+        // Get configured directories and scan for videos
+        $configuredDirs = [];
+        if (!empty($config['directories']) && is_array($config['directories'])) {
+            $configuredDirs = $config['directories'];
+        } else {
+            $configuredDirs = [$config['directory'] ?? 'videos'];
+        }
+        
+        $allowedExt = ['mp4', 'webm', 'ogg', 'mov', 'avi', 'mkv'];
+        $totalVideos = 0;
+        $processedVideos = 0;
+        $failedVideos = 0;
+        
+        // Scan each configured directory
+        foreach ($configuredDirs as $dirIndex => $dir) {
+            $fullPath = $dir;
+            if (!is_dir($fullPath)) {
+                // Try relative path if absolute doesn't exist
+                $relativePath = realpath(__DIR__ . '/' . $dir);
+                if ($relativePath && is_dir($relativePath)) {
+                    $fullPath = $relativePath;
+                } else {
+                    continue; // Skip invalid directories
+                }
+            }
+            
+            $allFiles = @scandir($fullPath);
+            if ($allFiles === false) continue;
+            
+            foreach ($allFiles as $file) {
+                if ($file !== '.' && $file !== '..' && is_file($fullPath . DIRECTORY_SEPARATOR . $file)) {
+                    $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
+                    if (in_array($ext, $allowedExt)) {
+                        $totalVideos++;
+                        $videoPath = $fullPath . DIRECTORY_SEPARATOR . $file;
+                        
+                        // Try to generate thumbnail using the same logic as thumb.php
+                        $mtime = @filemtime($videoPath) ?: 0;
+                        $hash = sha1($videoPath . '|' . $mtime);
+                        $thumbPath = rtrim($thumbDir, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . $hash . '.jpg';
+                        
+                        if (is_file($thumbPath)) {
+                            $processedVideos++; // Already exists
+                        } else {
+                            // Check ffmpeg availability
+                            $which = (stripos(PHP_OS, 'WIN') === 0) ? 'where' : 'which';
+                            $cmdCheck = $which . ' ffmpeg' . (stripos(PHP_OS, 'WIN') === 0 ? ' 2> NUL' : ' 2> /dev/null');
+                            @exec($cmdCheck, $out, $code);
+                            
+                            if ($code === 0) {
+                                $escapedIn = escapeshellarg($videoPath);
+                                $escapedOut = escapeshellarg($thumbPath);
+                                $cmd = 'ffmpeg -ss 1 -i ' . $escapedIn . ' -frames:v 1 -vf "scale=480:-1" -q:v 5 -y ' . $escapedOut . (stripos(PHP_OS, 'WIN') === 0 ? ' 2> NUL' : ' 2> /dev/null');
+                                @exec($cmd, $o, $c);
+                                if ($c === 0 && is_file($thumbPath)) {
+                                    $processedVideos++;
+                                } else {
+                                    $failedVideos++;
+                                }
+                            } else {
+                                $failedVideos++;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Set success flash message with results
+        $message = "Thumbnail generation completed: {$processedVideos} generated, {$failedVideos} failed out of {$totalVideos} total videos.";
+        if ($failedVideos > 0) {
+            $message .= " Failed videos may need FFmpeg to be installed or may have permission issues.";
+        }
+        $_SESSION['flash'] = ['type' => 'success', 'message' => $message];
+        
+        // Redirect back to System Status
+        header('Location: admin.php?admin-panel=system-status');
+        exit;
+    }
+
     // System reset: revert to defaults (config + dashboards)
     if ($currentSection === 'system-reset') {
         // Default base config
@@ -727,6 +820,82 @@ if ($needsAdminScan || !isset($adminCache['available_backgrounds'])) {
             transition: width 0.3s ease;
             border-radius: 4px;
         }
+        
+        /* Thumbnail Modal Styles */
+        .thumbnail-animation {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+        
+        .thumbnail-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            width: 100%;
+            margin-top: 10px;
+        }
+        
+        .stat-item {
+            text-align: center;
+            padding: 10px;
+            background: #1a1a1a;
+            border-radius: 6px;
+            border: 1px solid #333;
+        }
+        
+        .stat-label {
+            display: block;
+            font-size: 0.8em;
+            color: #888;
+            margin-bottom: 5px;
+        }
+        
+        .stat-value {
+            display: block;
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #4ecdc4;
+        }
+        
+        .console-output {
+            width: 100%;
+            max-height: 200px;
+            background: #0a0a0a;
+            border: 1px solid #333;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+        
+        .console-header {
+            background: #333;
+            color: #fff;
+            padding: 8px 12px;
+            font-size: 0.9em;
+            font-weight: bold;
+            border-bottom: 1px solid #444;
+        }
+        
+        .console-content {
+            padding: 12px;
+            max-height: 150px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85em;
+            line-height: 1.4;
+            color: #ccc;
+        }
+        
+        .console-content .log-entry {
+            margin-bottom: 5px;
+            padding: 3px 0;
+        }
+        
+        .console-content .log-info { color: #4ecdc4; }
+        .console-content .log-success { color: #4ecdc4; }
+        .console-content .log-warning { color: #ffa500; }
+        .console-content .log-error { color: #ff6b6b; }
     </style>
 </head>
 <body>
@@ -837,6 +1006,43 @@ if ($needsAdminScan || !isset($adminCache['available_backgrounds'])) {
                                 <p class="importing-details">This may take a few moments depending on the number of files.</p>
                                 <div class="progress-bar" style="display: none;">
                                     <div class="progress-fill"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Thumbnail Generation Modal -->
+                <div id="thumbnail-modal" class="modal" style="display: none;">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h3>🖼️ Generating Thumbnails</h3>
+                        </div>
+                        <div class="modal-body">
+                            <div class="thumbnail-animation">
+                                <div class="spinner"></div>
+                                <p id="thumbnail-status">Initializing thumbnail generation...</p>
+                                <p class="thumbnail-details">This may take several minutes depending on the number of videos.</p>
+                                <div class="progress-bar">
+                                    <div class="progress-fill"></div>
+                                </div>
+                                <div class="thumbnail-stats">
+                                    <div class="stat-item">
+                                        <span class="stat-label">Total Videos:</span>
+                                        <span class="stat-value" id="total-videos">0</span>
+                                    </div>
+                                    <div class="stat-item">
+                                        <span class="stat-label">Processed:</span>
+                                        <span class="stat-value" id="processed-videos">0</span>
+                                    </div>
+                                    <div class="stat-item">
+                                        <span class="stat-label">Failed:</span>
+                                        <span class="stat-value" id="failed-videos">0</span>
+                                    </div>
+                                </div>
+                                <div class="console-output" id="console-output">
+                                    <div class="console-header">Console Output:</div>
+                                    <div class="console-content" id="console-content"></div>
                                 </div>
                             </div>
                         </div>
@@ -980,6 +1186,18 @@ if ($needsAdminScan || !isset($adminCache['available_backgrounds'])) {
                                 <h4>📁 Directory Status</h4>
                                 <p>Configured directories: <strong><?php echo count($config['directories'] ?? [$config['directory'] ?? 'videos']); ?></strong></p>
                                 <p>Total videos found: <strong><?php echo number_format($totalVideos); ?></strong></p>
+                                <?php 
+                                $thumbDir = __DIR__ . '/data/thumbs';
+                                $thumbCount = 0;
+                                if (is_dir($thumbDir)) {
+                                    $thumbFiles = @scandir($thumbDir) ?: [];
+                                    $thumbCount = count(array_filter($thumbFiles, function($f) { return $f !== '.' && $f !== '..' && pathinfo($f, PATHINFO_EXTENSION) === 'jpg'; }));
+                                }
+                                ?>
+                                <p>Generated thumbnails: <strong><?php echo number_format($thumbCount); ?></strong></p>
+                                <?php if ($totalVideos > 0): ?>
+                                    <p>Thumbnail coverage: <strong><?php echo round(($thumbCount / $totalVideos) * 100); ?>%</strong></p>
+                                <?php endif; ?>
                             </div>
                             
                             <div class="status-card">
@@ -996,6 +1214,7 @@ if ($needsAdminScan || !isset($adminCache['available_backgrounds'])) {
                                          <input type="hidden" name="current_section" value="system-refresh" data-fixed>
                                          <button type="submit" class="btn secondary">🔁 Refresh Dashboards</button>
                                      </form>
+                                     <button type="button" class="btn primary" id="generate-thumbs-btn">🖼️ Generate Thumbnails</button>
                                        <form method="post" action="admin.php" onsubmit="return confirm('Delete ALL generated thumbnails and custom titles? This cannot be undone.');" style="display:inline;">
                                           <input type="hidden" name="current_section" value="clear-thumbs-titles" data-fixed>
                                           <button type="submit" class="btn secondary">🧹 Clear Thumbnails & Titles</button>
@@ -2156,6 +2375,179 @@ if ($needsAdminScan || !isset($adminCache['available_backgrounds'])) {
                 }
             });
         });
+
+        // Thumbnail generation with modal and progress tracking
+        const generateThumbsBtn = document.getElementById('generate-thumbs-btn');
+        const thumbnailModal = document.getElementById('thumbnail-modal');
+        
+        if (generateThumbsBtn && thumbnailModal) {
+            // Console logging functions
+            function logToConsole(message, type = 'info') {
+                const consoleContent = document.getElementById('console-content');
+                if (consoleContent) {
+                    const logEntry = document.createElement('div');
+                    logEntry.className = `log-entry log-${type}`;
+                    logEntry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+                    consoleContent.appendChild(logEntry);
+                    consoleContent.scrollTop = consoleContent.scrollHeight;
+                }
+                // Also log to browser console
+                console.log(`[Thumbnail Generation] ${message}`);
+            }
+            
+            // Update progress and stats
+            function updateProgress(processed, total, failed = 0) {
+                const progressFill = thumbnailModal.querySelector('.progress-fill');
+                const processedEl = document.getElementById('processed-videos');
+                const totalEl = document.getElementById('total-videos');
+                const failedEl = document.getElementById('failed-videos');
+                
+                if (progressFill && total > 0) {
+                    const percent = Math.round((processed / total) * 100);
+                    progressFill.style.width = percent + '%';
+                }
+                
+                if (processedEl) processedEl.textContent = processed;
+                if (totalEl) totalEl.textContent = total;
+                if (failedEl) failedEl.textContent = failed;
+            }
+            
+            // Show thumbnail modal
+            function showThumbnailModal() {
+                thumbnailModal.style.display = 'flex';
+                // Reset stats
+                updateProgress(0, 0, 0);
+                // Clear console
+                const consoleContent = document.getElementById('console-content');
+                if (consoleContent) consoleContent.innerHTML = '';
+                // Reset status
+                const statusEl = document.getElementById('thumbnail-status');
+                if (statusEl) statusEl.textContent = 'Initializing thumbnail generation...';
+            }
+            
+            // Hide thumbnail modal
+            function hideThumbnailModal() {
+                thumbnailModal.style.display = 'none';
+            }
+            
+            // Check FFmpeg availability
+            async function checkFFmpeg() {
+                try {
+                    const response = await fetch('api.php?action=check_ffmpeg');
+                    const data = await response.json();
+                    if (data.available) {
+                        logToConsole('FFmpeg is available and working', 'success');
+                        return true;
+                    } else {
+                        logToConsole('FFmpeg is not available or not working', 'error');
+                        logToConsole('Error: ' + (data.error || 'Unknown error'), 'error');
+                        return false;
+                    }
+                } catch (error) {
+                    logToConsole('Failed to check FFmpeg availability: ' + error.message, 'error');
+                    return false;
+                }
+            }
+            
+            // Start thumbnail generation
+            async function startThumbnailGeneration() {
+                showThumbnailModal();
+                logToConsole('Starting thumbnail generation process...', 'info');
+                
+                // Check FFmpeg first
+                const ffmpegAvailable = await checkFFmpeg();
+                if (!ffmpegAvailable) {
+                    logToConsole('Cannot proceed without FFmpeg. Please install FFmpeg and ensure it\'s in your system PATH.', 'error');
+                    updateProgress(0, 0, 0);
+                    return;
+                }
+                
+                // Get video count first
+                try {
+                    const response = await fetch('api.php?action=get_video_count');
+                    const data = await response.json();
+                    const totalVideos = data.count || 0;
+                    
+                    if (totalVideos === 0) {
+                        logToConsole('No videos found to process', 'warning');
+                        updateProgress(0, 0, 0);
+                        return;
+                    }
+                    
+                    logToConsole(`Found ${totalVideos} videos to process`, 'info');
+                    updateProgress(0, totalVideos, 0);
+                    
+                    // Start processing in batches
+                    let processed = 0;
+                    let failed = 0;
+                    const batchSize = 5;
+                    let offset = 0;
+                    
+                    const statusEl = document.getElementById('thumbnail-status');
+                    if (statusEl) statusEl.textContent = `Processing videos (${processed}/${totalVideos})...`;
+                    
+                    while (processed + failed < totalVideos) {
+                        try {
+                            const batchResponse = await fetch(`api.php?action=warm_thumbnails&offset=${offset}&batch=${batchSize}`);
+                            const batchData = await batchResponse.json();
+                            
+                            if (batchData.status === 'ok') {
+                                const batchProcessed = batchData.processed || 0;
+                                const batchFailed = batchData.failed || 0;
+                                
+                                processed += batchProcessed;
+                                failed += batchFailed;
+                                offset = batchData.nextOffset || (offset + batchSize);
+                                
+                                logToConsole(`Batch processed: ${batchProcessed} success, ${batchFailed} failed`, 'info');
+                                updateProgress(processed, totalVideos, failed);
+                                
+                                if (statusEl) statusEl.textContent = `Processing videos (${processed}/${totalVideos})...`;
+                                
+                                // Small delay between batches
+                                await new Promise(resolve => setTimeout(resolve, 100));
+                            } else {
+                                logToConsole(`Batch failed: ${batchData.error || 'Unknown error'}`, 'error');
+                                failed += batchSize;
+                                offset += batchSize;
+                            }
+                        } catch (error) {
+                            logToConsole(`Batch error: ${error.message}`, 'error');
+                            failed += batchSize;
+                            offset += batchSize;
+                        }
+                    }
+                    
+                    // Final update
+                    updateProgress(processed, totalVideos, failed);
+                    if (statusEl) statusEl.textContent = `Completed: ${processed} generated, ${failed} failed`;
+                    
+                    if (failed === 0) {
+                        logToConsole('All thumbnails generated successfully!', 'success');
+                    } else {
+                        logToConsole(`Thumbnail generation completed with ${failed} failures`, 'warning');
+                    }
+                    
+                    // Auto-hide modal after 5 seconds
+                    setTimeout(() => {
+                        hideThumbnailModal();
+                        // Refresh the page to show updated thumbnail counts
+                        location.reload();
+                    }, 5000);
+                    
+                } catch (error) {
+                    logToConsole(`Fatal error: ${error.message}`, 'error');
+                    if (statusEl) statusEl.textContent = 'Error occurred during processing';
+                }
+            }
+            
+            // Button click handler
+            generateThumbsBtn.addEventListener('click', function() {
+                if (confirm('Generate thumbnails for all videos? This may take several minutes.')) {
+                    startThumbnailGeneration();
+                }
+            });
+        }
     });
     </script>
 </body>

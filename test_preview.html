@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Preview Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #111;
+            color: #fff;
+            padding: 20px;
+        }
+        .test-item {
+            width: 300px;
+            height: 200px;
+            border: 2px solid #333;
+            margin: 20px;
+            position: relative;
+            background: #222;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .test-item img {
+            width: 100%;
+            height: calc(100% - 28px);
+            object-fit: contain;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+            opacity: 1;
+            transition: opacity 0.2s ease;
+        }
+        .test-item video {
+            width: 100%;
+            height: calc(100% - 28px);
+            object-fit: contain;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 0;
+        }
+        .test-item.previewing img {
+            opacity: 0;
+            pointer-events: none;
+        }
+        .test-item.previewing video {
+            z-index: 1;
+        }
+        .test-item .title {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 8px;
+            text-align: center;
+            z-index: 2;
+        }
+        .test-item .placeholder {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 28px;
+            background: #333;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            color: #4ecdc4;
+            z-index: 3;
+        }
+        .test-item.loaded .placeholder {
+            opacity: 0;
+            pointer-events: none;
+        }
+        button {
+            background: #4ecdc4;
+            color: #000;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 10px;
+        }
+        button:hover {
+            background: #3bb8b0;
+        }
+        .log {
+            background: #000;
+            color: #0f0;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            margin: 10px 0;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>Video Preview Test</h1>
+    
+    <div class="test-item" data-filename="Magical Rainforest.mp4" data-dir-index="0">
+        <img src="thumb.php?file=Magical Rainforest.mp4&dirIndex=0" alt="thumbnail" />
+        <div class="placeholder">▶</div>
+        <div class="title">Magical Rainforest.mp4</div>
+    </div>
+    
+    <div>
+        <button onclick="startPreview()">Start Preview</button>
+        <button onclick="stopPreview()">Stop Preview</button>
+        <button onclick="clearLog()">Clear Log</button>
+    </div>
+    
+    <div class="log" id="log"></div>
+    
+    <script>
+        let currentPreviewEl = null;
+        
+        function log(message) {
+            const logEl = document.getElementById('log');
+            logEl.innerHTML += new Date().toLocaleTimeString() + ': ' + message + '<br>';
+            logEl.scrollTop = logEl.scrollHeight;
+        }
+        
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+        }
+        
+        function stopPreview() {
+            if (!currentPreviewEl) return;
+            log('Stopping preview');
+            
+            const v = currentPreviewEl.querySelector('video');
+            if (v) {
+                try { v.pause(); } catch {}
+                v.loop = false;
+                if (v._previewHandler) {
+                    v.removeEventListener('timeupdate', v._previewHandler);
+                    v._previewHandler = null;
+                }
+                try { v.removeAttribute('src'); v.load(); } catch {}
+            }
+            
+            try { currentPreviewEl.classList.remove('previewing'); } catch {}
+            currentPreviewEl = null;
+            log('Preview stopped');
+        }
+        
+        function startPreview() {
+            const item = document.querySelector('.test-item');
+            if (!item) return;
+            if (currentPreviewEl === item) return;
+            
+            log('Starting preview for item');
+            stopPreview();
+            
+            let v = item.querySelector('video');
+            if (!v) {
+                log('Creating new video element');
+                v = document.createElement('video');
+                v.className = 'lazy-video';
+                v.setAttribute('muted', '');
+                v.setAttribute('playsinline', '');
+                v.setAttribute('webkit-playsinline', '');
+                v.setAttribute('x5-playsinline', '');
+                v.preload = 'metadata';
+                v.autoplay = true;
+                
+                const placeholder = item.querySelector('.placeholder');
+                if (placeholder && placeholder.parentNode === item) {
+                    item.insertBefore(v, placeholder);
+                } else {
+                    item.appendChild(v);
+                }
+                
+                v.addEventListener('loadeddata', () => {
+                    log('Video loaded, adding loaded and previewing classes');
+                    item.classList.add('loaded');
+                    item.classList.add('previewing');
+                }, { once: true });
+            }
+            
+            const filename = item.getAttribute('data-filename') || '';
+            const dirIndex = item.getAttribute('data-dir-index') || '0';
+            const url = 'video.php?file=' + encodeURIComponent(filename) + '&dirIndex=' + encodeURIComponent(dirIndex) + '#t=0.1';
+            
+            log('Setting video src to: ' + url);
+            if (v.src !== url) {
+                v.src = url;
+                try { v.load(); } catch {}
+            }
+            
+            v.muted = true;
+            v.playsInline = true;
+            v.loop = false;
+            
+            const handler = () => { 
+                try { 
+                    if (v.currentTime >= 5.8) {
+                        log('Resetting video to start');
+                        v.currentTime = 0.05; 
+                    } 
+                } catch {} 
+            };
+            
+            if (v._previewHandler) v.removeEventListener('timeupdate', v._previewHandler);
+            v._previewHandler = handler;
+            v.addEventListener('timeupdate', handler);
+            
+            const kick = () => {
+                log('Kicking video playback');
+                try { 
+                    v.currentTime = Math.min(v.duration ? Math.min(0.05, v.duration - 0.05) : 0.05, 0.2); 
+                } catch {}
+                v.play().catch((err) => {
+                    log('Video play failed: ' + err.message);
+                });
+            };
+            
+            if (v.readyState >= 1) { 
+                log('Video ready, kicking immediately');
+                kick(); 
+            } else {
+                log('Video not ready, waiting for loadedmetadata');
+                v.addEventListener('loadedmetadata', () => { 
+                    log('Video metadata loaded, kicking');
+                    kick(); 
+                }, { once: true });
+                
+                setTimeout(() => { 
+                    if (v.readyState < 1) { 
+                        log('Fallback timeout, attempting to play');
+                        v.play().catch((err) => {
+                            log('Fallback play failed: ' + err.message);
+                        }); 
+                    } 
+                }, 150);
+            }
+            
+            currentPreviewEl = item;
+            item.classList.add('previewing');
+            log('Preview started for item, classes: ' + item.className);
+        }
+        
+        log('Test page loaded');
+    </script>
+</body>
+</html>
