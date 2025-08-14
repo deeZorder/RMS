@@ -337,14 +337,25 @@ if (!empty($orderKeys)) {
 // Distribute videos across rows
 $rows = max(1, (int)$config['rows']);
 $clipsPerRow = max(1, (int)$config['clipsPerRow']);
-    $totalVideos = count($videoFiles);
+$totalVideos = count($videoFiles);
 
 // Handle case where no videos are found
 if ($totalVideos === 0) {
     $rowsData = [];
 } elseif ($rows > 0 && $totalVideos > 0) {
-    $videosPerRow = max(1, (int)ceil($totalVideos / $rows));
-    $rowsData = array_chunk($videoFiles, $videosPerRow);
+    // Fill each row with clipsPerRow videos before moving to next row
+    $rowsData = [];
+    $remainingVideos = $videoFiles;
+    
+    for ($rowIndex = 0; $rowIndex < $rows && !empty($remainingVideos); $rowIndex++) {
+        $rowVideos = array_splice($remainingVideos, 0, $clipsPerRow);
+        $rowsData[] = $rowVideos;
+    }
+    
+    // If there are still remaining videos, add them to the last row
+    if (!empty($remainingVideos)) {
+        $rowsData[count($rowsData) - 1] = array_merge($rowsData[count($rowsData) - 1], $remainingVideos);
+    }
 } else {
     $rowsData = [$videoFiles];
 }
@@ -387,7 +398,7 @@ if ($dashboardBg !== '') {
         <?php else: ?>
             <?php 
             // Define a CSS custom property to calculate item width for each row
-            $gap = 16; // gap in pixels
+            $gap = 12; // reduced gap in pixels for better media fit
             // We'll set data attributes on the container for JS to use
             ?>
             <?php foreach ($rowsData as $rowIndex => $videos): ?>
@@ -395,11 +406,12 @@ if ($dashboardBg !== '') {
                     <button class="arrow prev" aria-label="Scroll left">&#x2039;</button>
                     <div class="carousel-track" data-row="<?php echo $rowIndex; ?>">
                         <?php foreach ($videos as $video): 
-                            // Calculate style for width per item
-                            $calcWidth = "calc((100% - " . ($clipsPerRow - 1) . " * 16px) / " . $clipsPerRow . ")";
+                            // Calculate style for width per item with reduced gap
+                            $calcWidth = "calc((100% - " . ($clipsPerRow - 1) . " * {$gap}px) / " . $clipsPerRow . ")";
                         ?>
                             <div class="carousel-item" data-filename="<?php echo htmlspecialchars($video['name'], ENT_QUOTES, 'UTF-8'); ?>" data-dir-index="<?php echo (int)$video['dirIndex']; ?>" style="flex: 0 0 <?php echo $calcWidth; ?>;">
                                 <img data-src="thumb.php?file=<?php echo rawurlencode($video['name']); ?>&dirIndex=<?php echo (int)$video['dirIndex']; ?>" alt="thumbnail" class="lazy-thumb" loading="lazy" />
+                                <video data-src="preview.php?file=<?php echo rawurlencode($video['name']); ?>&dirIndex=<?php echo (int)$video['dirIndex']; ?>" class="lazy-preview-video" muted loop preload="none" style="display: none;"></video>
                                 <div class="video-placeholder">
                                     <div class="play-icon">▶</div>
                                 </div>
@@ -450,19 +462,15 @@ if ($dashboardBg !== '') {
         (function(){
             try { ['log','debug','info','table'].forEach(k => { if (typeof console[k] === 'function') console[k] = function(){}; }); } catch(_) {}
         })();
-        // --- Selected tile 3s preview loop helpers ---
+        // --- Selected tile preview loop helpers ---
         // Keep preview independent from polling by tracking active element
         let currentPreviewEl = null;
         function stopPreview() {
             if (!currentPreviewEl) return;
-            const v = currentPreviewEl.querySelector('.lazy-video');
+            const v = currentPreviewEl.querySelector('.lazy-preview-video');
             if (v) {
                 try { v.pause(); } catch {}
                 v.loop = false;
-                if (v._previewHandler) {
-                    v.removeEventListener('timeupdate', v._previewHandler);
-                    v._previewHandler = null;
-                }
                 // Release network/decoder to be safe
                 try { v.removeAttribute('src'); v.load(); } catch {}
             }
@@ -472,13 +480,9 @@ if ($dashboardBg !== '') {
         }
 
         function stopAllPreviews() {
-            document.querySelectorAll('.lazy-video').forEach(v => {
+            document.querySelectorAll('.lazy-preview-video').forEach(v => {
                 try { v.pause(); } catch {}
                 v.loop = false;
-                if (v._previewHandler) {
-                    v.removeEventListener('timeupdate', v._previewHandler);
-                    v._previewHandler = null;
-                }
                 try { v.removeAttribute('src'); v.load(); } catch {}
                 const item = v.closest('.carousel-item');
                 if (item) { item.classList.remove('previewing'); }
@@ -492,13 +496,14 @@ if ($dashboardBg !== '') {
             if (currentPreviewEl === item) return; // already previewing this tile
             stopAllPreviews(); // hard stop any other previews before starting a new one
 
-            // Ensure a <video> element exists for this tile (thumbnails are images by default)
-            let v = item.querySelector('.lazy-video');
-            console.log('Existing video element:', v);
+            // Get the existing video element (should already exist from HTML generation)
+            let v = item.querySelector('.lazy-preview-video');
+            console.log('Existing preview video element:', v);
+            
             if (!v) {
-                console.log('Creating new video element');
+                console.log('Creating new preview video element (fallback)');
                 v = document.createElement('video');
-                v.className = 'lazy-video';
+                v.className = 'lazy-preview-video';
                 
                 // Standard attributes for video playback
                 v.setAttribute('muted', '');
@@ -528,7 +533,8 @@ if ($dashboardBg !== '') {
                 v.style.webkitBackfaceVisibility = 'hidden';
                 
                 v.preload = 'metadata';
-                v.autoplay = false; // Don't set autoplay initially to avoid browser blocking
+                v.autoplay = false;
+                v.loop = true; // Loop the preview video
                 
                 // Insert video before placeholder so it sits underneath the title bar but above the image
                 const placeholder = item.querySelector('.video-placeholder');
@@ -537,34 +543,39 @@ if ($dashboardBg !== '') {
                 } else {
                     item.appendChild(v);
                 }
-                console.log('Video element inserted, placeholder:', placeholder);
+                console.log('Preview video element inserted, placeholder:', placeholder);
+            }
+            
+            // Set up event listeners if they haven't been set up yet
+            if (!v.hasAttribute('data-listeners-setup')) {
+                v.setAttribute('data-listeners-setup', 'true');
                 
                 // When video loads, mark tile as loaded to fade placeholder
                 v.addEventListener('loadeddata', () => {
-                    console.log('Video loaded, adding loaded and previewing classes');
+                    console.log('Preview video loaded, adding loaded and previewing classes');
                     item.classList.add('loaded');
                     item.classList.add('previewing'); // hide thumbnail overlay
                 }, { once: true });
                 
                 // Add error event listener for debugging
                 v.addEventListener('error', (e) => {
-                    console.error('Video error event:', e);
-                    console.error('Video error details:', v.error);
+                    console.error('Preview video error event:', e);
+                    console.error('Preview video error details:', v.error);
                 });
                 
                 // Add loadstart event for debugging
                 v.addEventListener('loadstart', () => {
-                    console.log('Video loadstart event fired');
+                    console.log('Preview video loadstart event fired');
                 });
                 
                 // Add canplay event for debugging
                 v.addEventListener('canplay', () => {
-                    console.log('Video canplay event fired');
+                    console.log('Preview video canplay event fired');
                 });
                 
                 // Add playing event for debugging
                 v.addEventListener('playing', () => {
-                    console.log('Video playing event fired - video should be visible now');
+                    console.log('Preview video playing event fired - video should be visible now');
                     // Force a repaint on Android TV
                     v.style.display = 'none';
                     v.offsetHeight; // Force reflow
@@ -572,49 +583,44 @@ if ($dashboardBg !== '') {
                 });
             }
 
-            // Build video URL from tile data attributes
+            // Build preview video URL from tile data attributes
             const filename = item.getAttribute('data-filename') || '';
             const dirIndex = item.getAttribute('data-dir-index') || '0';
             
-            // Use the XAMPP-optimized video endpoint for Apache compatibility
-            let url = 'video_xampp.php?file=' + encodeURIComponent(filename) + '&dirIndex=' + encodeURIComponent(dirIndex) + '#t=0.1';
+            // Use the preview.php endpoint for animated preview loops
+            let url = 'preview.php?file=' + encodeURIComponent(filename) + '&dirIndex=' + encodeURIComponent(dirIndex);
             
-            // Log the video URL being used
-            console.log('Setting video src to:', url);
-            console.log('Using XAMPP-optimized video endpoint for Apache compatibility');
+            // Log the preview video URL being used
+            console.log('Setting preview video src to:', url);
+            console.log('Using preview.php endpoint for animated preview loops');
             
             if (v.src !== url) {
                 v.src = url;
-                try { v.load(); } catch (e) { console.error('Video load() error:', e); }
+                try { v.load(); } catch (e) { console.error('Preview video load() error:', e); }
             }
 
-            // Configure preview loop ~0-5.8s
+            // Configure preview loop - the video will loop automatically
             v.muted = true;
             v.playsInline = true;
-            v.loop = false;
-            const handler = () => { try { if (v.currentTime >= 5.8) v.currentTime = 0.05; } catch {} };
-            if (v._previewHandler) v.removeEventListener('timeupdate', v._previewHandler);
-            v._previewHandler = handler;
-            v.addEventListener('timeupdate', handler);
+            v.loop = true;
 
             const kick = () => {
-                console.log('Kicking video playback');
-                try { v.currentTime = Math.min(v.duration ? Math.min(0.05, v.duration - 0.05) : 0.05, 0.2); } catch {}
+                console.log('Kicking preview video playback');
                 
                 // Try to play with comprehensive error handling
                 const playPromise = v.play();
                 if (playPromise !== undefined) {
                     playPromise.then(() => {
-                        console.log('Video play() succeeded');
+                        console.log('Preview video play() succeeded');
                         // Force visibility on Android TV after successful play
                         setTimeout(() => {
                             v.style.opacity = '1';
                             v.style.visibility = 'visible';
                             v.style.display = 'block';
-                            console.log('Forced video visibility on Android TV');
+                            console.log('Forced preview video visibility on Android TV');
                         }, 100);
                     }).catch((err) => {
-                        console.error('Video play() failed:', err);
+                        console.error('Preview video play() failed:', err);
                         console.error('Error name:', err.name);
                         console.error('Error message:', err.message);
                         
@@ -625,7 +631,7 @@ if ($dashboardBg !== '') {
                             // We'll try to play again after a short delay
                             setTimeout(() => {
                                 v.play().catch((retryErr) => {
-                                    console.error('Retry play() failed:', retryErr);
+                                    console.error('Retry preview video play() failed:', retryErr);
                                 });
                             }, 100);
                         }
@@ -634,22 +640,22 @@ if ($dashboardBg !== '') {
             };
             
             if (v.readyState >= 1) { 
-                console.log('Video ready, kicking immediately');
+                console.log('Preview video ready, kicking immediately');
                 kick(); 
             }
             else {
-                console.log('Video not ready, waiting for loadedmetadata');
+                console.log('Preview video not ready, waiting for loadedmetadata');
                 v.addEventListener('loadedmetadata', () => { 
-                    console.log('Video metadata loaded, kicking');
+                    console.log('Preview video metadata loaded, kicking');
                     kick(); 
                 }, { once: true });
                 
                 // Fallback timeout to force play attempt
                 setTimeout(() => { 
                     if (v.readyState < 1) { 
-                        console.log('Fallback timeout, attempting to play');
+                        console.log('Fallback timeout, attempting to play preview video');
                         v.play().catch((err) => {
-                            console.error('Fallback play failed:', err);
+                            console.error('Fallback preview video play failed:', err);
                         }); 
                     } 
                 }, 150);
@@ -658,11 +664,12 @@ if ($dashboardBg !== '') {
             currentPreviewEl = item;
             item.classList.add('previewing');
             console.log('Preview started for item, classes:', item.className);
-            console.log('Video element:', v);
-            console.log('Video src:', v.src);
-            console.log('Video readyState:', v.readyState);
-            console.log('Video muted:', v.muted);
-            console.log('Video playsInline:', v.playsInline);
+            console.log('Preview video element:', v);
+            console.log('Preview video src:', v.src);
+            console.log('Preview video readyState:', v.readyState);
+            console.log('Preview video muted:', v.muted);
+            console.log('Preview video playsInline:', v.playsInline);
+            console.log('Preview video loop:', v.loop);
             console.log('Item DOM structure:', item.innerHTML);
             
             // Log user agent for debugging tablet issues
@@ -945,7 +952,7 @@ if ($dashboardBg !== '') {
                         // Ensure thumbnail overlay is visible unless the tile is explicitly previewing
                         if (!carouselItem.classList.contains('previewing')) {
                             // Remove any stray preview video element to prevent flicker
-                            const stray = carouselItem.querySelector('video.lazy-video');
+                            const stray = carouselItem.querySelector('video.lazy-preview-video');
                             if (stray) {
                                 try { stray.pause(); } catch {}
                                 try { stray.remove(); } catch {}
@@ -1014,18 +1021,18 @@ if ($dashboardBg !== '') {
             }
         }
         
-        // Performance optimization: Limit initial video loading
-        const maxInitialVideos = 12; // Lower initial priority load to reduce startup cost
-        let initialVideoCount = 0;
+        // Performance optimization: Limit initial preview video loading
+        const maxInitialPreviews = 8; // Lower initial priority load to reduce startup cost
+        let initialPreviewCount = 0;
         
         document.querySelectorAll('.carousel-item').forEach((item, index) => {
-            const video = item.querySelector('.lazy-video');
-            if (video && initialVideoCount < maxInitialVideos) {
-                // Priority load for first videos
+            const previewVideo = item.querySelector('.lazy-preview-video');
+            if (previewVideo && initialPreviewCount < maxInitialPreviews) {
+                // Priority load for first preview videos
                 item.style.setProperty('--load-priority', 'high');
-                initialVideoCount++;
+                initialPreviewCount++;
             } else {
-                // Lower priority for later videos
+                // Lower priority for later preview videos
                 item.style.setProperty('--load-priority', 'low');
             }
         });

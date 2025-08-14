@@ -100,7 +100,59 @@ if (isset($_GET['nocontrols']) || isset($_GET['hide_controls'])) {
         const sourceEl = document.getElementById('videoSource');
         const placeholder = document.getElementById('placeholder');
         let currentVideo = '';
+        
+        // Screen timeout variables
+        let screenTimeoutId = null;
+        let warningTimeoutId = null;
+        let isScreenOff = false;
 
+        // Function to start screen timeout when no video is playing
+        function startScreenTimeout() {
+            // Clear any existing timeouts
+            if (screenTimeoutId) clearTimeout(screenTimeoutId);
+            if (warningTimeoutId) clearTimeout(warningTimeoutId);
+            
+            // Set warning after 30 seconds
+            warningTimeoutId = setTimeout(() => {
+                if (!currentVideo && !isScreenOff) {
+                    showWarning("The screen will turn off in 30 seconds.");
+                }
+            }, 30000);
+            
+            // Turn off screen after 60 seconds total
+            screenTimeoutId = setTimeout(() => {
+                if (!currentVideo && !isScreenOff) {
+                    turnOffScreen();
+                }
+            }, 60000);
+        }
+        
+        // Function to show warning message
+        function showWarning(message) {
+            placeholder.innerHTML = `<div class="warning-message">⚠️ ${message}</div>`;
+            placeholder.style.display = 'block';
+            placeholder.style.borderColor = '#ff6b6b';
+            placeholder.style.color = '#ff6b6b';
+        }
+        
+        // Function to turn off screen
+        function turnOffScreen() {
+            isScreenOff = true;
+            videoEl.style.display = 'none';
+            placeholder.style.display = 'none';
+            document.body.style.backgroundColor = '#000';
+            document.body.style.cursor = 'none';
+        }
+        
+        // Function to reset screen timeout
+        function resetScreenTimeout() {
+            if (screenTimeoutId) clearTimeout(screenTimeoutId);
+            if (warningTimeoutId) clearTimeout(warningTimeoutId);
+            isScreenOff = false;
+            document.body.style.backgroundColor = '';
+            document.body.style.cursor = '';
+        }
+        
         // Function to update video element with new source
         function loadVideo(filename, shouldPlay = false, dirIndex = 0) {
             if (!filename) {
@@ -108,6 +160,8 @@ if (isset($_GET['nocontrols']) || isset($_GET['hide_controls'])) {
                 placeholder.style.display = 'block';
                 videoEl.pause();
                 currentVideo = '';
+                // Start screen timeout when no video is loaded
+                startScreenTimeout();
                 return;
             }
             // If same video is already playing, do nothing
@@ -120,6 +174,9 @@ if (isset($_GET['nocontrols']) || isset($_GET['hide_controls'])) {
             placeholder.style.display = 'none';
             videoEl.style.display = 'block';
             videoEl.load();
+            
+            // Reset screen timeout when video is loaded
+            resetScreenTimeout();
             
                     // Ensure loop is disabled when loading new video (will be set by poll function)
         videoEl.loop = false;
@@ -166,6 +223,11 @@ if (isset($_GET['nocontrols']) || isset($_GET['hide_controls'])) {
             return 'profile=default';
         }
 
+        // Start initial screen timeout if no video is loaded
+        if (!currentVideo) {
+            startScreenTimeout();
+        }
+        
         // Poll server to check for updates
         let isPolling = false; // Prevent overlapping polls
         let pollTimeoutId = null; // Track timeout ID for cleanup

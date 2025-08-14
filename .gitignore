@@ -1,5 +1,7 @@
 # Ignore videos folder
 videos/
+data/previews/
+data/thumbs/
 
 # Common files to ignore
 *.log

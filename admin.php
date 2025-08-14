@@ -220,10 +220,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
-    // System action: clear thumbnails and titles
+    // System action: clear thumbnails, previews and titles
     if ($currentSection === 'clear-thumbs-titles') {
         $baseDir = __DIR__;
         $thumbDir = $baseDir . '/data/thumbs';
+        $previewDir = $baseDir . '/data/previews';
         $titlesFile = $baseDir . '/data/video_titles.json';
         $adminCachePath = $baseDir . '/data/admin_cache.json';
 
@@ -237,6 +238,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
 
+        // Remove all previews
+        if (is_dir($previewDir)) {
+            $items = @scandir($previewDir) ?: [];
+            foreach ($items as $item) {
+                if ($item === '.' || $item === '..') { continue; }
+                $path = $previewDir . DIRECTORY_SEPARATOR . $item;
+                if (is_file($path)) { @unlink($path); }
+            }
+        }
+
         // Remove titles file
         if (file_exists($titlesFile)) { @unlink($titlesFile); }
 
@@ -246,7 +257,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Touch refresh so dashboards/screens update
         @file_put_contents($baseDir . '/data/dashboard_refresh.txt', time());
 
-        $_SESSION['flash'] = ['type' => 'success', 'message' => 'Cleared thumbnails and titles'];
+        $_SESSION['flash'] = ['type' => 'success', 'message' => 'Cleared thumbnails, previews and titles'];
         header('Location: admin.php?admin-panel=system-status');
         exit;
     }
@@ -354,6 +365,219 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($failedVideos > 0) {
             $message .= " Failed videos may need FFmpeg to be installed or may have permission issues.";
         }
+        $_SESSION['flash'] = ['type' => 'success', 'message' => $message];
+        
+        // Redirect back to System Status
+        header('Location: admin.php?admin-panel=system-status');
+        exit;
+    }
+
+    // System action: generate previews
+    if ($currentSection === 'generate-previews') {
+        $baseDir = __DIR__;
+        $configPath = $baseDir . '/config.json';
+        $config = file_exists($configPath) ? (json_decode(@file_get_contents($configPath), true) ?: []) : [];
+        
+        // Resolve video directories (same logic as dashboard.php)
+        $clipsDirs = [];
+        if (!empty($config['directories']) && is_array($config['directories'])) {
+            $clipsDirs = $config['directories'];
+        } else {
+            $clipsDirs = [ $config['directory'] ?? 'videos' ];
+        }
+        
+        // Normalize directory absolute paths (same logic as dashboard.php)
+        $dirAbsPaths = [];
+        foreach ($clipsDirs as $dirIndex => $clipsDir) {
+            $resolved = is_dir($clipsDir) ? $clipsDir : realpath(__DIR__ . '/' . $clipsDir);
+            if ($resolved && is_dir($resolved)) {
+                $dirAbsPaths[$dirIndex] = $resolved;
+            } else {
+                $dirAbsPaths[$dirIndex] = $clipsDir; // fallback
+            }
+        }
+        
+        // Get video files using same logic as dashboard.php
+        $videoFiles = [];
+        $allowedExt = ['mp4', 'webm', 'ogg', 'mov', 'avi', 'mkv', 'wmv', 'flv'];
+        
+        // Try to use admin cache first (same as dashboard.php)
+        $adminCachePath = $baseDir . '/data/admin_cache.json';
+        $usedCacheForVideos = false;
+        if (file_exists($adminCachePath)) {
+            $adminCache = json_decode(@file_get_contents($adminCachePath), true) ?: [];
+            if (!empty($adminCache['all_video_files']) && is_array($adminCache['all_video_files'])) {
+                $lastScan = (int)($adminCache['last_scan'] ?? 0);
+                // Determine if cache is still fresh by comparing directory mtimes
+                $maxDirModTime = 0;
+                foreach ($dirAbsPaths as $absDir) {
+                    if ($absDir && is_dir($absDir)) {
+                        $mt = @filemtime($absDir) ?: 0;
+                        if ($mt > $maxDirModTime) { $maxDirModTime = $mt; }
+                    }
+                }
+                if ($lastScan >= $maxDirModTime) {
+                    // Rebuild videoFiles array from cache, remapping dirIndex by absolute path when possible
+                    foreach ($adminCache['all_video_files'] as $entry) {
+                        $name = isset($entry['name']) ? (string)$entry['name'] : '';
+                        if ($name === '') { continue; }
+                        $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+                        if (!in_array($ext, $allowedExt, true)) { continue; }
+                        $entryPath = isset($entry['path']) ? (string)$entry['path'] : '';
+                        $mappedIndex = null;
+                        if ($entryPath !== '') {
+                            $normEntryPath = str_replace(['/', '\\'], [DIRECTORY_SEPARATOR, DIRECTORY_SEPARATOR], $entryPath);
+                            foreach ($dirAbsPaths as $idx => $absDir) {
+                                $prefix = rtrim((string)$absDir, '/\\') . DIRECTORY_SEPARATOR;
+                                if (strpos($normEntryPath, $prefix) === 0) { $mappedIndex = (int)$idx; break; }
+                            }
+                        }
+                        if ($mappedIndex === null) {
+                            $di = (int)($entry['dirIndex'] ?? 0);
+                            if (isset($dirAbsPaths[$di])) { $mappedIndex = $di; }
+                        }
+                        if ($mappedIndex === null) { continue; }
+                        $videoFiles[] = ['name' => $name, 'dirIndex' => $mappedIndex];
+                    }
+                    $usedCacheForVideos = true;
+                }
+            }
+        }
+        
+        // Fallback: scan directories if cache not used or unavailable (same logic as dashboard.php)
+        if (!$usedCacheForVideos) {
+            foreach ($clipsDirs as $dirIndex => $clipsDir) {
+                $resolved = isset($dirAbsPaths[$dirIndex]) ? $dirAbsPaths[$dirIndex] : (is_dir($clipsDir) ? $clipsDir : realpath(__DIR__ . '/' . $clipsDir));
+                if ($resolved && is_dir($resolved)) {
+                    $items = @scandir($resolved) ?: [];
+                    foreach ($items as $file) {
+                        if ($file === '.' || $file === '..') { continue; }
+                        $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
+                        if (in_array($ext, $allowedExt, true)) {
+                            $videoFiles[] = ['name' => $file, 'dirIndex' => $dirIndex];
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Get video order from default profile (same logic as dashboard.php)
+        $orderPath = $baseDir . '/data/profiles/default/video_order.json';
+        $orderKeys = [];
+        if (file_exists($orderPath)) {
+            $orderJson = json_decode(@file_get_contents($orderPath), true);
+            if (is_array($orderJson) && isset($orderJson['order']) && is_array($orderJson['order'])) {
+                $orderKeys = $orderJson['order'];
+            }
+        }
+        
+        // Sort video files according to the order (same logic as dashboard.php)
+        if (!empty($orderKeys)) {
+            $orderedVideos = [];
+            $unorderedVideos = [];
+            
+            // First, add videos in the correct order
+            foreach ($orderKeys as $orderKey) {
+                if (strpos($orderKey, '|') !== false) {
+                    [$dirPath, $filename] = explode('|', $orderKey, 2);
+                    foreach ($videoFiles as $video) {
+                        if ($video['name'] === $filename && 
+                            (isset($dirAbsPaths[$video['dirIndex']]) ? $dirAbsPaths[$video['dirIndex']] : '') === $dirPath) {
+                            $orderedVideos[] = $video;
+                            break;
+                        }
+                    }
+                }
+            }
+            
+            // Then add any remaining videos that weren't in the order
+            foreach ($videoFiles as $video) {
+                $videoKey = (isset($dirAbsPaths[$video['dirIndex']]) ? $dirAbsPaths[$video['dirIndex']] : '') . '|' . $video['name'];
+                if (!in_array($videoKey, $orderKeys)) {
+                    $unorderedVideos[] = $video;
+                }
+            }
+            
+            // Combine ordered and unordered videos
+            $videoFiles = array_merge($orderedVideos, $unorderedVideos);
+        }
+        
+        $previewDir = $baseDir . '/data/previews';
+        if (!is_dir($previewDir)) {
+            @mkdir($previewDir, 0755, true);
+        }
+        
+        $processedVideos = 0;
+        $failedVideos = 0;
+        $totalVideos = count($videoFiles);
+        
+        // Process videos in the correct order
+        foreach ($videoFiles as $video) {
+            $videoDir = $clipsDirs[$video['dirIndex']] ?? $clipsDirs[0];
+            $fullVideoDir = $baseDir . DIRECTORY_SEPARATOR . $videoDir;
+            $videoPath = $fullVideoDir . DIRECTORY_SEPARATOR . $video['name'];
+            
+            if (!is_file($videoPath)) { continue; }
+            
+            // Generate hash for preview filename (same as preview.php)
+            // Use normalized path to ensure hash consistency across platforms
+            $normalizedPath = str_replace(['\\', '/'], '/', $videoPath);
+            $mtime = @filemtime($videoPath) ?: 0;
+            $hash = sha1($normalizedPath . '|' . $mtime . '|preview');
+            $previewPath = $previewDir . DIRECTORY_SEPARATOR . $hash . '.mp4';
+            
+            // Debug: Log the first few videos to help troubleshoot
+            if ($processedVideos < 3) {
+                error_log("Preview Debug: Video: {$video['name']}, Path: {$videoPath}, Normalized: {$normalizedPath}, Hash: {$hash}");
+            }
+            
+            // Skip if preview already exists and is newer than video
+            if (file_exists($previewPath) && filemtime($previewPath) >= filemtime($videoPath)) {
+                $processedVideos++;
+                continue;
+            }
+            
+            // Generate preview using FFmpeg (6-second segment from middle, CRF 28, 480px width)
+            // Get video duration to extract a segment from the middle
+            $durationCmd = 'ffprobe -v quiet -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 ' . escapeshellarg($videoPath) . ' 2> ' . (stripos(PHP_OS, 'WIN') === 0 ? 'NUL' : '/dev/null');
+            $duration = @exec($durationCmd);
+            $duration = floatval($duration) ?: 0;
+            
+            // Extract a 6-second segment from middle of video (or from 2 seconds if duration is unknown)
+            $seekTime = $duration > 0 ? max(1, ($duration / 2) - 3) : 2.0;
+            $segmentDuration = min(6.0, $duration > 0 ? $duration : 6.0);
+            
+            // Generate preview video loop - 6 seconds, CRF 28, scaled to 480px width
+            $ffmpegCmd = "ffmpeg -ss " . $seekTime . " -i " . escapeshellarg($videoPath) . " -t " . $segmentDuration . " -c:v libx264 -preset fast -crf 28 -c:a aac -b:a 64k -vf \"scale=480:-1\" -movflags +faststart -y " . escapeshellarg($previewPath) . " 2>&1";
+            $output = [];
+            $returnCode = 0;
+            @exec($ffmpegCmd, $output, $returnCode);
+            
+            if ($returnCode === 0 && file_exists($previewPath)) {
+                $processedVideos++;
+            } else {
+                $failedVideos++;
+                // Clean up failed preview
+                if (file_exists($previewPath)) {
+                    @unlink($previewPath);
+                }
+            }
+        }
+        
+        // Set success flash message with results
+        $message = "Preview generation completed: {$processedVideos} generated, {$failedVideos} failed out of {$totalVideos} total videos.";
+        if ($failedVideos > 0) {
+            $message .= " Failed videos may need FFmpeg to be installed or may have permission issues.";
+        }
+        
+        // Add debug info for troubleshooting
+        $debugInfo = "Debug: Generated previews for " . count($videoFiles) . " videos. ";
+        if (!empty($videoFiles)) {
+            $debugInfo .= "First video: " . $videoFiles[0]['name'] . " (dir: " . $videoFiles[0]['dirIndex'] . "). ";
+            $debugInfo .= "Last video: " . end($videoFiles)['name'] . " (dir: " . end($videoFiles)['dirIndex'] . ").";
+        }
+        $message .= " " . $debugInfo;
+        
         $_SESSION['flash'] = ['type' => 'success', 'message' => $message];
         
         // Redirect back to System Status
@@ -896,6 +1120,46 @@ if ($needsAdminScan || !isset($adminCache['available_backgrounds'])) {
         .console-content .log-success { color: #4ecdc4; }
         .console-content .log-warning { color: #ffa500; }
         .console-content .log-error { color: #ff6b6b; }
+        
+        /* Dashboard Video Controls Status Indicators */
+        .np-status {
+            transition: all 0.3s ease;
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            text-align: center;
+            line-height: 16px;
+            border-radius: 50%;
+            background: rgba(0,0,0,0.2);
+        }
+        
+        .np-status:hover {
+            transform: scale(1.2);
+            background: rgba(0,0,0,0.4);
+        }
+        
+        .now-playing {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+        }
+        
+        .now-playing .np-title {
+            flex: 1;
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        
+        .np-label {
+            transition: opacity 0.3s ease;
+        }
+        
+        .np-label[style*="display: none"] {
+            opacity: 0;
+        }
     </style>
 </head>
 <body>
@@ -1198,6 +1462,18 @@ if ($needsAdminScan || !isset($adminCache['available_backgrounds'])) {
                                 <?php if ($totalVideos > 0): ?>
                                     <p>Thumbnail coverage: <strong><?php echo round(($thumbCount / $totalVideos) * 100); ?>%</strong></p>
                                 <?php endif; ?>
+                                <?php 
+                                $previewDir = __DIR__ . '/data/previews';
+                                $previewCount = 0;
+                                if (is_dir($previewDir)) {
+                                    $previewFiles = @scandir($previewDir) ?: [];
+                                    $previewCount = count(array_filter($previewFiles, function($f) { return $f !== '.' && $f !== '..' && pathinfo($f, PATHINFO_EXTENSION) === 'mp4'; }));
+                                }
+                                ?>
+                                <p>Generated previews: <strong><?php echo number_format($previewCount); ?></strong></p>
+                                <?php if ($totalVideos > 0): ?>
+                                    <p>Preview coverage: <strong><?php echo round(($previewCount / $totalVideos) * 100); ?>%</strong></p>
+                                <?php endif; ?>
                             </div>
                             
                             <div class="status-card">
@@ -1215,9 +1491,10 @@ if ($needsAdminScan || !isset($adminCache['available_backgrounds'])) {
                                          <button type="submit" class="btn secondary">🔁 Refresh Dashboards</button>
                                      </form>
                                      <button type="button" class="btn primary" id="generate-thumbs-btn">🖼️ Generate Thumbnails</button>
+                                     <button type="button" class="btn primary" id="generate-previews-btn">🎬 Generate Previews</button>
                                        <form method="post" action="admin.php" onsubmit="return confirm('Delete ALL generated thumbnails and custom titles? This cannot be undone.');" style="display:inline;">
                                           <input type="hidden" name="current_section" value="clear-thumbs-titles" data-fixed>
-                                          <button type="submit" class="btn secondary">🧹 Clear Thumbnails & Titles</button>
+                                          <button type="submit" class="btn secondary">🧹 Clear Titles, Thumbnails & Previews</button>
                                       </form>
                                      <form method="post" action="admin.php" onsubmit="return confirm('Reset configuration and dashboards to defaults?');" style="display:inline;">
                                         <input type="hidden" name="current_section" value="system-reset" data-fixed>
@@ -2267,7 +2544,7 @@ if ($needsAdminScan || !isset($adminCache['available_backgrounds'])) {
                       + '<button class="btn secondary dc-pause" data-q="' + query + '">Pause</button>'
                       + '<button class="btn secondary dc-play" data-q="' + query + '">Play</button>'
                       + '</div>';
-                html += '<div class="now-playing" data-profile="' + escapeHtml(id) + '" data-q="' + query + '" style="margin-top:8px; color:#ccc; font-size:0.95rem;">Now playing: <span class="np-title">None</span></div>';
+                html += '<div class="now-playing" data-profile="' + escapeHtml(id) + '" data-q="' + query + '" style="margin-top:8px; color:#ccc; font-size:0.95rem;"><span class="np-label">Now playing:</span><span class="np-title">Loading status...</span><span class="np-status" style="font-size:0.8em; color:#666; cursor:help;" title="🔄 Updating | ▶️ Playing (shows label) | ⏸️ Paused | ⏹️ Stopped | ❌ Error">🔄</span></div>';
                 html += '</div>';
             });
             html += '</div>';
@@ -2282,6 +2559,9 @@ if ($needsAdminScan || !isset($adminCache['available_backgrounds'])) {
                             .then(() => {
                                 btn.textContent = 'Done';
                                 setTimeout(() => { btn.textContent = btnClass.split('-')[1].replace(/^./, c=>c.toUpperCase()); }, 800);
+                                
+                                // Refresh status immediately after action
+                                setTimeout(() => updateNowPlaying(), 500);
                             })
                             .catch(() => {});
                     });
@@ -2296,46 +2576,161 @@ if ($needsAdminScan || !isset($adminCache['available_backgrounds'])) {
             function updateNowPlaying() {
                 const npEls = Array.from(container.querySelectorAll('.now-playing'));
                 if (npEls.length === 0) return;
-                // Fetch titles once
-                fetch('api.php?action=get_video_titles&profile=default')
-                    .then(res => res.json())
-                    .then(titlesData => {
+                
+                console.log('Updating now playing status for', npEls.length, 'dashboards');
+                
+                // Show updating status
+                npEls.forEach(el => {
+                    const statusEl = el.querySelector('.np-status');
+                    const labelEl = el.querySelector('.np-label');
+                    if (statusEl) {
+                        statusEl.textContent = '🔄';
+                        statusEl.style.color = '#4ecdc4';
+                    }
+                    // Hide label during loading since we don't know if there's a video yet
+                    if (labelEl) labelEl.style.display = 'none';
+                });
+                
+                // Update each dashboard's now playing status
+                npEls.forEach(el => {
+                    const profileId = el.getAttribute('data-profile');
+                    const q = el.getAttribute('data-q') || '';
+                    
+                    console.log(`Fetching status for profile ${profileId} with query: ${q}`);
+                    
+                    // Get both current video AND playback state (like dashboard.php does)
+                    Promise.all([
+                        fetch(`api.php?action=get_current_video&${q}`).then(r => r.json()).catch(() => ({ currentVideo: null })),
+                        fetch(`api.php?action=get_playback_state&${q}`).then(r => r.json()).catch(() => ({ state: 'stop' })),
+                        fetch(`api.php?action=get_video_titles&profile=${encodeURIComponent(profileId)}`).then(r => r.json()).catch(() => ({ titles: {} }))
+                    ]).then(([videoData, stateData, titlesData]) => {
+                        const holder = el.querySelector('.np-title');
+                        const statusEl = el.querySelector('.np-status');
+                        const labelEl = el.querySelector('.np-label');
+                        if (!holder) return;
+                        
+                        console.log(`Profile ${profileId} data:`, { video: videoData, state: stateData, titles: titlesData });
+                        
+                        const cv = videoData && videoData.currentVideo;
+                        const state = stateData && stateData.state;
                         const titles = titlesData && titlesData.titles ? titlesData.titles : {};
-                        npEls.forEach(el => {
-                            const q = el.getAttribute('data-q') || '';
-                            fetch('api.php?action=get_current_video&' + q)
-                                .then(r => r.json())
-                                .then(data => {
-                                    const holder = el.querySelector('.np-title');
-                                    if (!holder) return;
-                                    const cv = data && data.currentVideo;
-                                    if (!cv) { holder.textContent = 'None'; return; }
-                                    let filename = '';
-                                    let dirIndex = 0;
-                                    if (typeof cv === 'object') {
-                                        filename = cv.filename || '';
-                                        dirIndex = (cv.dirIndex != null) ? cv.dirIndex : 0;
-                                    } else {
-                                        filename = String(cv || '');
-                                    }
-                                    if (!filename) { holder.textContent = 'None'; return; }
-                                    const key = String(dirIndex) + '|' + filename;
-                                    const custom = titles[key];
-                                    const display = custom || filename.replace(/\.[^/.]+$/, '');
-                                    holder.textContent = display;
-                                })
-                                .catch(() => {
-                                    const holder = el.querySelector('.np-title');
-                                    if (holder) holder.textContent = 'None';
-                                });
-                        });
-                    })
-                    .catch(() => {
-                        npEls.forEach(el => { const h = el.querySelector('.np-title'); if (h) h.textContent = 'None'; });
+                        
+                        if (!cv || (typeof cv === 'object' && !cv.filename) || (typeof cv === 'string' && cv.trim() === '')) { 
+                            // No video selected
+                            const labelEl = el.querySelector('.np-label');
+                            if (labelEl) labelEl.style.display = 'none';
+                            holder.textContent = 'No video selected'; 
+                            if (statusEl) {
+                                statusEl.textContent = '⏸️';
+                                statusEl.style.color = '#888';
+                            }
+                            console.log(`Profile ${profileId}: No current video`);
+                            return; 
+                        }
+                        
+                        let filename = '';
+                        let dirIndex = 0;
+                        if (typeof cv === 'object') {
+                            filename = cv.filename || '';
+                            dirIndex = (cv.dirIndex != null) ? cv.dirIndex : 0;
+                        } else {
+                            filename = String(cv || '');
+                        }
+                        
+                        if (!filename) { 
+                            // Empty filename
+                            const labelEl = el.querySelector('.np-label');
+                            if (labelEl) labelEl.style.display = 'none';
+                            holder.textContent = 'No video selected'; 
+                            if (statusEl) {
+                                statusEl.textContent = '⏸️';
+                                statusEl.style.color = '#888';
+                            }
+                            console.log(`Profile ${profileId}: Empty filename`);
+                            return; 
+                        }
+                        
+                        // Look up custom title for this profile
+                        const key = String(dirIndex) + '|' + filename;
+                        const custom = titles[key];
+                        const display = custom || filename.replace(/\.[^/.]+$/, '');
+                        
+                        console.log(`Profile ${profileId}: Video "${filename}" (dir: ${dirIndex}) -> Display: "${display}" (custom: ${custom ? 'yes' : 'no'})`);
+                        
+                        // Determine status based on playback state (like dashboard.php)
+                        let statusText = display;
+                        let statusIcon = '▶️';
+                        let statusColor = '#4ecdc4';
+                        let showLabel = false;
+                        
+                        if (state === 'play') {
+                            statusText = display;
+                            statusIcon = '▶️';
+                            statusColor = '#4ecdc4';
+                            showLabel = true; // Only show "Now playing:" when actually playing
+                        } else if (state === 'pause') {
+                            statusText = display;
+                            statusIcon = '⏸️';
+                            statusColor = '#ffa500';
+                            showLabel = false; // Hide label when paused
+                        } else if (state === 'stop') {
+                            statusText = display;
+                            statusIcon = '⏹️';
+                            statusColor = '#888';
+                            showLabel = false; // Hide label when stopped
+                        } else {
+                            statusText = display;
+                            statusIcon = '⏸️';
+                            statusColor = '#888';
+                            showLabel = false; // Hide label for unknown states
+                        }
+                        
+                        // Show/hide label based on playback state
+                        if (labelEl) {
+                            labelEl.style.display = showLabel ? 'inline' : 'none';
+                        }
+                        
+                        holder.textContent = statusText;
+                        if (statusEl) {
+                            statusEl.textContent = statusIcon;
+                            statusEl.style.color = statusColor;
+                        }
+                        
+                        console.log(`Profile ${profileId}: Final status - "${statusText}" with icon ${statusIcon}, label visible: ${showLabel}`);
+                        
+                    }).catch((err) => {
+                        console.error(`Failed to get status for profile ${profileId}:`, err);
+                        const holder = el.querySelector('.np-title');
+                        const statusEl = el.querySelector('.np-status');
+                        const labelEl = el.querySelector('.np-label');
+                        if (holder) holder.textContent = 'Error loading status';
+                        if (labelEl) labelEl.style.display = 'none';
+                        if (statusEl) {
+                            statusEl.textContent = '❌';
+                            statusEl.style.color = '#ff6b6b';
+                        }
                     });
+                });
             }
             updateNowPlaying();
+            // Update less frequently to reduce server load
             setInterval(updateNowPlaying, 8000);
+            
+            // Add manual refresh button for debugging
+            const refreshBtn = document.createElement('button');
+            refreshBtn.className = 'btn secondary';
+            refreshBtn.textContent = '🔄 Refresh Status';
+            refreshBtn.style.marginTop = '10px';
+            refreshBtn.addEventListener('click', () => {
+                refreshBtn.textContent = '🔄 Updating...';
+                refreshBtn.disabled = true;
+                updateNowPlaying();
+                setTimeout(() => {
+                    refreshBtn.textContent = '🔄 Refresh Status';
+                    refreshBtn.disabled = false;
+                }, 1000);
+            });
+            container.appendChild(refreshBtn);
         }
         renderDashboardVideoControls();
 
@@ -2545,6 +2940,128 @@ if ($needsAdminScan || !isset($adminCache['available_backgrounds'])) {
             generateThumbsBtn.addEventListener('click', function() {
                 if (confirm('Generate thumbnails for all videos? This may take several minutes.')) {
                     startThumbnailGeneration();
+                }
+            });
+        }
+
+        // Preview generation with modal and progress tracking
+        const generatePreviewsBtn = document.getElementById('generate-previews-btn');
+        
+        if (generatePreviewsBtn) {
+            // Show preview generation modal
+            function showPreviewModal() {
+                // Create modal if it doesn't exist
+                let previewModal = document.getElementById('preview-modal');
+                if (!previewModal) {
+                    previewModal = document.createElement('div');
+                    previewModal.id = 'preview-modal';
+                    previewModal.className = 'modal';
+                    previewModal.innerHTML = `
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h3>🎬 Generating Previews</h3>
+                                <span class="close" onclick="this.parentElement.parentElement.parentElement.style.display='none'">&times;</span>
+                            </div>
+                            <div class="modal-body">
+                                <div class="progress-container">
+                                    <div class="progress-bar">
+                                        <div class="progress-fill" style="width: 0%"></div>
+                                    </div>
+                                </div>
+                                <div class="stats">
+                                    <span>Processed: <span id="preview-processed">0</span></span>
+                                    <span>Total: <span id="preview-total">0</span></span>
+                                    <span>Failed: <span id="preview-failed">0</span></span>
+                                </div>
+                                <div id="preview-status">Initializing preview generation...</div>
+                                <div class="console">
+                                    <div id="preview-console-content"></div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    document.body.appendChild(previewModal);
+                }
+                previewModal.style.display = 'flex';
+                
+                // Reset stats
+                document.getElementById('preview-processed').textContent = '0';
+                document.getElementById('preview-total').textContent = '0';
+                document.getElementById('preview-failed').textContent = '0';
+                document.getElementById('preview-status').textContent = 'Initializing preview generation...';
+                document.getElementById('preview-console-content').innerHTML = '';
+            }
+            
+            // Hide preview modal
+            function hidePreviewModal() {
+                const previewModal = document.getElementById('preview-modal');
+                if (previewModal) {
+                    previewModal.style.display = 'none';
+                }
+            }
+            
+            // Log to preview console
+            function logToPreviewConsole(message, type = 'info') {
+                const consoleContent = document.getElementById('preview-console-content');
+                if (consoleContent) {
+                    const logEntry = document.createElement('div');
+                    logEntry.className = `log-entry log-${type}`;
+                    logEntry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+                    consoleContent.appendChild(logEntry);
+                    consoleContent.scrollTop = consoleContent.scrollHeight;
+                }
+                console.log(`[Preview Generation] ${message}`);
+            }
+            
+            // Update preview progress
+            function updatePreviewProgress(processed, total, failed = 0) {
+                const progressFill = document.querySelector('#preview-modal .progress-fill');
+                if (progressFill && total > 0) {
+                    const percent = Math.round((processed / total) * 100);
+                    progressFill.style.width = percent + '%';
+                }
+                
+                document.getElementById('preview-processed').textContent = processed;
+                document.getElementById('preview-total').textContent = total;
+                document.getElementById('preview-failed').textContent = failed;
+            }
+            
+            // Start preview generation
+            async function startPreviewGeneration() {
+                showPreviewModal();
+                logToPreviewConsole('Starting preview generation process...', 'info');
+                
+                try {
+                    // Submit form to generate previews
+                    const form = document.createElement('form');
+                    form.method = 'POST';
+                    form.action = 'admin.php';
+                    
+                    const input = document.createElement('input');
+                    input.type = 'hidden';
+                    input.name = 'current_section';
+                    input.value = 'generate-previews';
+                    
+                    form.appendChild(input);
+                    document.body.appendChild(form);
+                    
+                    // Show processing message
+                    document.getElementById('preview-status').textContent = 'Processing previews...';
+                    logToPreviewConsole('Processing previews using FFmpeg...', 'info');
+                    
+                    // Submit form
+                    form.submit();
+                    
+                } catch (error) {
+                    logToPreviewConsole(`Error: ${error.message}`, 'error');
+                    document.getElementById('preview-status').textContent = 'Error occurred during processing';
+                }
+            }
+            
+            // Button click handler
+            generatePreviewsBtn.addEventListener('click', function() {
+                if (confirm('Generate preview loops for all videos? This may take several minutes and requires FFmpeg.')) {
+                    startPreviewGeneration();
                 }
             });
         }
