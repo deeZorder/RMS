@@ -125,6 +125,10 @@ if (!$usedCacheForVideos) {
     }
 }
 
+// ============================================================================
+// FUNCTION DEFINITIONS - All functions must be defined before they're called
+// ============================================================================
+
 // Helper function to load cached video order efficiently
 function loadCachedVideoOrder($profileId) {
     $orderPath = __DIR__ . '/data/profiles/' . preg_replace('/[^a-zA-Z0-9_\-]/', '', $profileId) . '/video_order.json';
@@ -155,22 +159,6 @@ function isCacheStale($profileId, $dirAbsPaths) {
     }
     
     return $maxDirModTime > $lastScanTime;
-}
-
-// Helper function to get cache statistics
-function getCacheStats($profileId) {
-    $lastScanPath = __DIR__ . '/data/profiles/' . preg_replace('/[^a-zA-Z0-9_\-]/', '', $profileId) . '/last_scan.txt';
-    $orderPath = __DIR__ . '/data/profiles/' . preg_replace('/[^a-zA-Z0-9_\-]/', '', $profileId) . '/video_order.json';
-    
-    $stats = [
-        'hasCache' => file_exists($lastScanPath),
-        'lastScan' => file_exists($lastScanPath) ? (int)file_get_contents($lastScanPath) : 0,
-        'cacheAge' => file_exists($lastScanPath) ? time() - (int)file_get_contents($lastScanPath) : 0,
-        'hasOrderFile' => file_exists($orderPath),
-        'orderFileSize' => file_exists($orderPath) ? filesize($orderPath) : 0
-    ];
-    
-    return $stats;
 }
 
 // Auto-update video order list when directory changes
@@ -252,31 +240,6 @@ function autoUpdateVideoOrder($baseDir, $profileId, $dirAbsPaths, $videoFiles) {
     return [];
 }
 
-// Apply saved order if available, with smart caching based on file modification times
-$orderPath = __DIR__ . '/data/profiles/' . preg_replace('/[^a-zA-Z0-9_\-]/', '', $selectedDashboardId) . '/video_order.json';
-$lastScanPath = __DIR__ . '/data/profiles/' . preg_replace('/[^a-zA-Z0-9_\-]/', '', $selectedDashboardId) . '/last_scan.txt';
-
-// Only scan if directories have changed since last scan
-$needsScan = isCacheStale($selectedDashboardId, $dirAbsPaths);
-
-if ($needsScan) {
-    // Directories have changed, need to scan
-    $startTime = microtime(true);
-    $orderKeys = autoUpdateVideoOrder(__DIR__, $selectedDashboardId, $dirAbsPaths, $videoFiles);
-    $scanTime = round((microtime(true) - $startTime) * 1000, 2);
-    // Update last scan time
-    file_put_contents($lastScanPath, (string)time());
-    
-    // Silent in production
-} else {
-    // Use cached data - much faster
-    $startTime = microtime(true);
-    $orderKeys = loadCachedVideoOrder($selectedDashboardId);
-    $cacheTime = round((microtime(true) - $startTime) * 1000, 2);
-    
-    // Silent in production
-}
-
 // Auto-update current video if it no longer exists
 function autoUpdateCurrentVideo($baseDir, $profileId, $videoFiles, $orderKeys) {
     $currentVideoPath = $baseDir . '/data/profiles/' . preg_replace('/[^a-zA-Z0-9_\-]/', '', $profileId) . '/current_video.txt';
@@ -314,6 +277,31 @@ function autoUpdateCurrentVideo($baseDir, $profileId, $videoFiles, $orderKeys) {
     }
     
     return null;
+}
+
+// ============================================================================
+// MAIN EXECUTION CODE - Now all functions are defined and can be called
+// ============================================================================
+
+// Apply saved order if available, with smart caching based on file modification times
+$orderPath = __DIR__ . '/data/profiles/' . preg_replace('/[^a-zA-Z0-9_\-]/', '', $selectedDashboardId) . '/video_order.json';
+$lastScanPath = __DIR__ . '/data/profiles/' . preg_replace('/[^a-zA-Z0-9_\-]/', '', $selectedDashboardId) . '/last_scan.txt';
+
+// Only scan if directories have changed since last scan
+$needsScan = isCacheStale($selectedDashboardId, $dirAbsPaths);
+
+if ($needsScan) {
+    // Directories have changed, need to scan
+    $orderKeys = autoUpdateVideoOrder(__DIR__, $selectedDashboardId, $dirAbsPaths, $videoFiles);
+    // Update last scan time
+    file_put_contents($lastScanPath, (string)time());
+    
+    // Silent in production
+} else {
+    // Use cached data - much faster
+    $orderKeys = loadCachedVideoOrder($selectedDashboardId);
+    
+    // Silent in production
 }
 
 // Update current video if needed
@@ -686,27 +674,20 @@ if ($dashboardBg !== '') {
                 v.style.zIndex = '999';
             }
         }
-        // Determine profile query to send to API
-        function getProfileQuery() {
-            const params = new URLSearchParams(location.search);
-            if (params.has('profile')) {
-                return 'profile=' + encodeURIComponent(params.get('profile'));
-            }
-            if (params.has('d')) {
-                const n = parseInt(params.get('d') || '0', 10);
-                if (n === 0) return 'profile=default';
-                if (n >= 1) return 'profile=dashboard' + n;
-            }
-            if (params.has('dashboard')) {
-                return 'profile=' + encodeURIComponent(params.get('dashboard'));
-            }
-            // For default profile, use 'profile=default'
-            return 'profile=default';
+        // Build profile query for API calls
+        const params = new URLSearchParams(location.search);
+        let profileQuery = 'profile=default';
+        if (params.has('profile')) {
+            profileQuery = 'profile=' + encodeURIComponent(params.get('profile'));
+        } else if (params.has('d')) {
+            const n = parseInt(params.get('d') || '0', 10);
+            if (n === 0) profileQuery = 'profile=default';
+            else if (n >= 1) profileQuery = 'profile=dashboard' + n;
+        } else if (params.has('dashboard')) {
+            profileQuery = 'profile=' + encodeURIComponent(params.get('dashboard'));
         }
-        const profileQuery = getProfileQuery();
         
         // Monitor config.json for changes and auto-refresh dashboard
-        let lastConfigCheck = Date.now();
         const configCheckInterval = 5000; // Check every 5 seconds
         
         function checkConfigForChanges() {
