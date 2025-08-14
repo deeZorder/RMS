@@ -367,7 +367,7 @@ if ($dashboardBg !== '') {
 }
 ?>
 <body class="dashboard-bg"<?php echo $bodyStyle; ?>>
-    <main class="dashboard-page container">
+    <main class="dashboard-page container" style="padding-bottom: 160px;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
             <h2></h2>
             <div id="loading-indicator" style="display: none; font-size: 14px; color: #4ecdc4;">
@@ -424,7 +424,7 @@ if ($dashboardBg !== '') {
                 <div class="playback-controls">
                     <button type="button" id="loop-btn" class="btn secondary">🔁 Loop</button>
                     <button type="button" id="all-btn" class="btn secondary">📺 Play All</button>
-                    <button type="button" id="external-audio-btn" class="btn secondary" title="Use phone or external device for audio">🔈 External Audio</button>
+                    <button type="button" id="external-audio-btn" class="btn secondary" title="Use phone or external device for audio" style="display: none;">🔈 External Audio</button>
                 </div>
             </div>
             <div class="volume-control">

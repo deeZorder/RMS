@@ -907,7 +907,6 @@ body.dashboard-bg {
     display: block;
     border-radius: 4px;
     transition: all 0.2s ease;
-    background: #000; /* Debug background to make video area visible */
 }
 
 /* Dashboard image thumbnails should fill like videos */
@@ -941,7 +940,6 @@ body.dashboard-bg {
 /* When previewing, ensure video is visible above the hidden thumbnail */
 .carousel-item.previewing video { 
     z-index: 1; 
-    border: 2px solid red; /* Debug border to make video visible */
     /* Ensure video is visible on tablets */
     opacity: 1 !important;
     visibility: visible !important;
@@ -1187,7 +1185,7 @@ body.dashboard-bg .btn.secondary {
   color: #e6e6e6;
   border: 1px solid rgba(255,255,255,0.06);
 }
-body.dashboard-bg .btn { border-radius: 999px; padding: 9px 16px; }
+body.dashboard-bg .btn { border-radius: 999px; padding: 9px 16px; font-size: 18px; font-weight: bold; }
 
 /* Carousel arrows in subtle grey */
 body.dashboard-bg .carousel-row .arrow {
@@ -1265,12 +1263,18 @@ body.dashboard-bg .volume-control input[type="range"]::-moz-range-progress {
 body.dashboard-bg .carousel-item .title { color: #ededed; }
 body.dashboard-bg .current-video-info { color: #cfcfcf; }
 
-/* Sticky, glassy controls block for dashboard */
+/* Fixed bottom controls block for dashboard */
 body.dashboard-bg .video-controls {
-  position: sticky;
-  top: 12px;
-  z-index: 5;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
   border: 1px solid rgba(255,255,255,0.08);
+  margin: 0;
+  border-radius: 0;
+  border-top: 1px solid #333;
+  background: rgba(0, 0, 0, 0.479);
 }
 
 /* Roomier rows for a calmer layout */
@@ -1823,8 +1827,9 @@ body.dashboard-bg .video-placeholder {
     
     .carousel-item.previewing video {
         /* Enhanced visibility for tablets */
-        border: 3px solid #00ff00; /* Green border for tablet debugging */
-        box-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
+        opacity: 1;
+        visibility: visible;
+        display: block;
     }
 }
 
@@ -1850,10 +1855,6 @@ body.dashboard-bg .video-placeholder {
         bottom: 28px !important;
         /* Force repaint */
         will-change: transform;
-        /* Android TV specific */
-        background: #000 !important;
-        border: 4px solid #ffff00 !important; /* Yellow border for Android TV debugging */
-        box-shadow: 0 0 20px rgba(255, 255, 0, 0.8) !important;
     }
     
     /* Hide thumbnail completely on Android TV when previewing */
@@ -1869,23 +1870,4 @@ body.dashboard-bg .video-placeholder {
         visibility: hidden !important;
         display: none !important;
     }
-}
-
-/* Additional debugging for video elements */
-.carousel-item video:not([src]),
-.carousel-item .lazy-video:not([src]) {
-    /* Show when video has no source */
-    background: repeating-linear-gradient(
-        45deg,
-        #ff0000,
-        #ff0000 10px,
-        #ff6666 10px,
-        #ff6666 20px
-    );
-}
-
-.carousel-item video[src],
-.carousel-item .lazy-video[src] {
-    /* Show when video has source */
-    background: #000;
 }

@@ -1,25 +1,19 @@
 {
-    "last_scan": 1755074853,
+    "last_scan": 1755157871,
     "available_directories": [
         ".git",
         "data",
         "videos"
     ],
-    "total_videos": 1,
-    "all_video_files": [
-        {
-            "name": "Magical Rainforest.mp4",
-            "dirIndex": 0,
-            "path": "videos\\Magical Rainforest.mp4"
-        }
-    ],
+    "total_videos": 0,
+    "all_video_files": [],
     "pagination_info": {
-        "total": 1,
+        "total": 0,
         "pages": 1,
         "current": 1,
         "per_page": 20,
         "start": 1,
-        "end": 1
+        "end": 0
     },
     "available_backgrounds": [
         "assets/backgrounds/silver.jpg"
