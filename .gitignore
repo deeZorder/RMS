@@ -1,0 +1,9 @@
+# Ignore videos folder
+videos/
+
+# Common files to ignore
+*.log
+.DS_Store
+Thumbs.db
+*.tmp
+*.cache
