@@ -21,6 +21,25 @@ if (file_exists($configPath)) {
     $config = ['directory' => 'videos'];
 }
 
+// Function to check if connection is still alive
+function isConnectionAlive() {
+    return !connection_aborted() && !connection_status();
+}
+
+// Function to safely output video data on Windows Server
+function safeOutput($data) {
+    if (ob_get_level()) {
+        ob_end_clean(); // Clear any output buffers
+    }
+    echo $data;
+    flush();
+    
+    // Windows Server specific flush
+    if (function_exists('fastcgi_finish_request')) {
+        fastcgi_finish_request();
+    }
+}
+
 // Get the video filename and optional directory index from the URL
 $videoFile = $_GET['file'] ?? '';
 $dirIndex = isset($_GET['dirIndex']) ? (int)$_GET['dirIndex'] : 0;
@@ -123,25 +142,6 @@ header('Access-Control-Allow-Headers: Range, If-Range, If-Modified-Since, If-Non
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(200);
     exit;
-}
-
-// Function to check if connection is still alive
-function isConnectionAlive() {
-    return !connection_aborted() && !connection_status();
-}
-
-// Function to safely output video data on Windows Server
-function safeOutput($data) {
-    if (ob_get_level()) {
-        ob_end_clean(); // Clear any output buffers
-    }
-    echo $data;
-    flush();
-    
-    // Windows Server specific flush
-    if (function_exists('fastcgi_finish_request')) {
-        fastcgi_finish_request();
-    }
 }
 
 // Handle range requests for video streaming

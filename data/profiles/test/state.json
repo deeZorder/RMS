@@ -1,0 +1,18 @@
+{
+    "currentVideo": {
+        "filename": "",
+        "dirIndex": 0
+    },
+    "playbackState": "stop",
+    "volume": 50,
+    "muted": false,
+    "loopMode": "off",
+    "playAllMode": "off",
+    "externalAudioMode": "off",
+    "lastControlChange": 1755534891,
+    "lastConfigCheck": 0,
+    "lastScan": 0,
+    "lastRefreshTrigger": 1755615269,
+    "refreshRequested": true,
+    "testKey": "testValue"
+}

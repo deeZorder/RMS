@@ -8,6 +8,14 @@ $baseDir = __DIR__;
 $configPath = $baseDir . '/config.json';
 $config = file_exists($configPath) ? (json_decode(@file_get_contents($configPath), true) ?: []) : [];
 
+// Helper function to check if ffmpeg is available
+function hasFfmpeg() {
+    $which = (stripos(PHP_OS, 'WIN') === 0) ? 'where' : 'which';
+    $cmd = $which . ' ffmpeg 2> ' . (stripos(PHP_OS, 'WIN') === 0 ? 'NUL' : '/dev/null');
+    @exec($cmd, $out, $code);
+    return $code === 0;
+}
+
 // Resolve video directories similar to video.php
 $videoDirs = [];
 if (!empty($config['directories']) && is_array($config['directories'])) {
@@ -58,13 +66,6 @@ if (is_file($thumbPath)) {
 
 // Generate thumbnail
 // Try ffmpeg if available
-function hasFfmpeg() {
-    $which = (stripos(PHP_OS, 'WIN') === 0) ? 'where' : 'which';
-    $cmd = $which . ' ffmpeg 2> ' . (stripos(PHP_OS, 'WIN') === 0 ? 'NUL' : '/dev/null');
-    @exec($cmd, $out, $code);
-    return $code === 0;
-}
-
 $generated = false;
 if (hasFfmpeg()) {
     $escapedIn = escapeshellarg($videoPath);

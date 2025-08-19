@@ -2,6 +2,9 @@
 // dashboard.php
 // User interface to browse and select videos for playback.
 
+// Include shared state management
+require_once __DIR__ . '/state_manager.php';
+
 // Security headers (must be sent before any output)
 header('X-Content-Type-Options: nosniff');
 header('X-Frame-Options: SAMEORIGIN');
@@ -143,22 +146,35 @@ function loadCachedVideoOrder($profileId) {
 
 // Helper function to check if cache is stale
 function isCacheStale($profileId, $dirAbsPaths) {
-    $lastScanPath = __DIR__ . '/data/profiles/' . preg_replace('/[^a-zA-Z0-9_\-]/', '', $profileId) . '/last_scan.txt';
-    
-    if (!file_exists($lastScanPath)) {
-        return true; // No cache exists
+    // Ensure getLastScan function is available from state_manager.php
+    if (!function_exists('getLastScan')) {
+        error_log('getLastScan function not available - state_manager.php may not be properly included');
+        return true; // Force rescan if function not available
     }
     
-    $lastScanTime = (int)file_get_contents($lastScanPath);
-    $maxDirModTime = 0;
-    
-    foreach ($dirAbsPaths as $dir) {
-        if (is_dir($dir)) {
-            $maxDirModTime = max($maxDirModTime, filemtime($dir));
+    try {
+        $lastScanTime = getLastScan($profileId);
+        
+        if ($lastScanTime === 0) {
+            return true; // No cache exists
         }
+        
+        $maxDirModTime = 0;
+        
+        foreach ($dirAbsPaths as $dir) {
+            if (is_dir($dir)) {
+                $modTime = @filemtime($dir);
+                if ($modTime !== false) {
+                    $maxDirModTime = max($maxDirModTime, $modTime);
+                }
+            }
+        }
+        
+        return $maxDirModTime > $lastScanTime;
+    } catch (Exception $e) {
+        error_log('Error in isCacheStale: ' . $e->getMessage());
+        return true; // Force rescan on any error
     }
-    
-    return $maxDirModTime > $lastScanTime;
 }
 
 // Auto-update video order list when directory changes
@@ -242,37 +258,40 @@ function autoUpdateVideoOrder($baseDir, $profileId, $dirAbsPaths, $videoFiles) {
 
 // Auto-update current video if it no longer exists
 function autoUpdateCurrentVideo($baseDir, $profileId, $videoFiles, $orderKeys) {
-    $currentVideoPath = $baseDir . '/data/profiles/' . preg_replace('/[^a-zA-Z0-9_\-]/', '', $profileId) . '/current_video.txt';
+    if (!function_exists('getCurrentVideo')) {
+        return null; // Cannot update if function not available
+    }
     
-    if (file_exists($currentVideoPath)) {
-        $currentVideoData = json_decode(@file_get_contents($currentVideoPath), true);
-        if (is_array($currentVideoData) && isset($currentVideoData['filename'])) {
-            $currentFilename = $currentVideoData['filename'];
-            $currentDirIndex = isset($currentVideoData['dirIndex']) ? (int)$currentVideoData['dirIndex'] : 0;
-            
-            // Check if current video still exists
-            $videoExists = false;
-            foreach ($videoFiles as $video) {
-                if ($video['name'] === $currentFilename && $video['dirIndex'] === $currentDirIndex) {
-                    $videoExists = true;
-                    break;
-                }
+    $currentVideo = getCurrentVideo($profileId);
+    
+    if (!empty($currentVideo['filename'])) {
+        $currentFilename = $currentVideo['filename'];
+        $currentDirIndex = $currentVideo['dirIndex'];
+        
+        // Check if current video still exists
+        $videoExists = false;
+        foreach ($videoFiles as $video) {
+            if ($video['name'] === $currentFilename && $video['dirIndex'] === $currentDirIndex) {
+                $videoExists = true;
+                break;
+            }
+        }
+        
+        // If current video doesn't exist, set it to the first available video
+        if (!$videoExists && !empty($videoFiles)) {
+            $firstVideo = $videoFiles[0];
+            $newCurrentVideo = [
+                'filename' => $firstVideo['name'],
+                'dirIndex' => $firstVideo['dirIndex']
+            ];
+            if (function_exists('setCurrentVideo')) {
+                setCurrentVideo($profileId, $firstVideo['name'], $firstVideo['dirIndex']);
             }
             
-            // If current video doesn't exist, set it to the first available video
-            if (!$videoExists && !empty($videoFiles)) {
-                $firstVideo = $videoFiles[0];
-                $newCurrentVideo = [
-                    'filename' => $firstVideo['name'],
-                    'dirIndex' => $firstVideo['dirIndex']
-                ];
-                @file_put_contents($currentVideoPath, json_encode($newCurrentVideo, JSON_UNESCAPED_SLASHES));
-                
-                // Log the auto-update for debugging
-                error_log("Auto-updated current video for profile $profileId: " . $firstVideo['name']);
-                
-                return $newCurrentVideo;
-            }
+            // Log the auto-update for debugging
+            error_log("Auto-updated current video for profile $profileId: " . $firstVideo['name']);
+            
+            return $newCurrentVideo;
         }
     }
     
@@ -285,7 +304,6 @@ function autoUpdateCurrentVideo($baseDir, $profileId, $videoFiles, $orderKeys) {
 
 // Apply saved order if available, with smart caching based on file modification times
 $orderPath = __DIR__ . '/data/profiles/' . preg_replace('/[^a-zA-Z0-9_\-]/', '', $selectedDashboardId) . '/video_order.json';
-$lastScanPath = __DIR__ . '/data/profiles/' . preg_replace('/[^a-zA-Z0-9_\-]/', '', $selectedDashboardId) . '/last_scan.txt';
 
 // Only scan if directories have changed since last scan
 $needsScan = isCacheStale($selectedDashboardId, $dirAbsPaths);
@@ -294,7 +312,9 @@ if ($needsScan) {
     // Directories have changed, need to scan
     $orderKeys = autoUpdateVideoOrder(__DIR__, $selectedDashboardId, $dirAbsPaths, $videoFiles);
     // Update last scan time
-    file_put_contents($lastScanPath, (string)time());
+    if (function_exists('updateLastScan')) {
+        updateLastScan($selectedDashboardId);
+    }
     
     // Silent in production
 } else {
@@ -330,19 +350,25 @@ $totalVideos = count($videoFiles);
 // Handle case where no videos are found
 if ($totalVideos === 0) {
     $rowsData = [];
+} elseif ($rows === 1) {
+    // Single row gets all videos
+    $rowsData = [$videoFiles];
 } elseif ($rows > 0 && $totalVideos > 0) {
-    // Fill each row with clipsPerRow videos before moving to next row
+    // Balanced distribution across multiple rows
     $rowsData = [];
-    $remainingVideos = $videoFiles;
+    $videosPerRowBase = floor($totalVideos / $rows);
+    $extraVideos = $totalVideos % $rows;
     
-    for ($rowIndex = 0; $rowIndex < $rows && !empty($remainingVideos); $rowIndex++) {
-        $rowVideos = array_splice($remainingVideos, 0, $clipsPerRow);
+    $videoIndex = 0;
+    for ($rowIndex = 0; $rowIndex < $rows; $rowIndex++) {
+        // Some rows get one extra video to distribute the remainder
+        $videosForThisRow = $videosPerRowBase + ($rowIndex < $extraVideos ? 1 : 0);
+        $rowVideos = array_slice($videoFiles, $videoIndex, $videosForThisRow);
         $rowsData[] = $rowVideos;
-    }
-    
-    // If there are still remaining videos, add them to the last row
-    if (!empty($remainingVideos)) {
-        $rowsData[count($rowsData) - 1] = array_merge($rowsData[count($rowsData) - 1], $remainingVideos);
+        $videoIndex += $videosForThisRow;
+        
+        // Stop if we've distributed all videos
+        if ($videoIndex >= $totalVideos) break;
     }
 } else {
     $rowsData = [$videoFiles];
@@ -690,16 +716,37 @@ if ($dashboardBg !== '') {
         // Monitor config.json for changes and auto-refresh dashboard
         const configCheckInterval = 5000; // Check every 5 seconds
         
+        let configCheckErrorCount = 0;
         function checkConfigForChanges() {
-            fetch('api.php?action=check_config_changes&' + profileQuery + '&t=' + Date.now())
-                .then(response => response.json())
+            fetch('api.php?action=check_config_changes&' + profileQuery + '&t=' + Date.now(), {
+                signal: AbortSignal.timeout(5000) // 5 second timeout
+            })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    return response.json();
+                })
                 .then(data => {
+                    configCheckErrorCount = 0; // Reset error count on success
                     if (data.needsRefresh) {
                         // auto-refresh on config change
                         location.reload();
                     }
                 })
-                .catch(() => {});
+                .catch((error) => {
+                    configCheckErrorCount++;
+                    console.error('Config check error:', error.message);
+                    
+                    // If we get too many errors, stop checking temporarily
+                    if (configCheckErrorCount > 3) {
+                        console.warn('Too many config check errors, pausing checks for 60 seconds');
+                        setTimeout(() => {
+                            configCheckErrorCount = 0; // Reset error count
+                            checkConfigForChanges(); // Try again
+                        }, 60000);
+                    }
+                });
         }
         
         // Start config monitoring
@@ -1055,11 +1102,11 @@ if ($dashboardBg !== '') {
                     // Update current video name with custom title (controls are persistent)
                     updateVideoControlsTitle(filename, dirIndex);
 
-                    // Set playback state to stop when a new video is selected
-                    fetch('api.php?action=stop_video&' + profileQuery, { method: 'POST' })
+                    // Start playing the selected video automatically
+                    fetch('api.php?action=play_video&' + profileQuery, { method: 'POST' })
                         .then(res => res.json())
                         .then(() => {
-                            updateButtonStates('stop');
+                            updateButtonStates('play');
                         });
                 });
             });
@@ -1149,10 +1196,19 @@ if ($dashboardBg !== '') {
         
         // Poll for playback state to keep buttons in sync
         let currentPlaybackState = 'stop';
+        let pollErrorCount = 0;
         function pollPlaybackState() {
-            fetch('api.php?action=get_playback_state&' + profileQuery)
-                .then(res => res.json())
+            fetch('api.php?action=get_playback_state&' + profileQuery, {
+                signal: AbortSignal.timeout(5000) // 5 second timeout
+            })
+                .then(res => {
+                    if (!res.ok) {
+                        throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+                    }
+                    return res.json();
+                })
                 .then(data => {
+                    pollErrorCount = 0; // Reset error count on success
                     updateButtonStates(data.state);
                     currentPlaybackState = data.state || 'stop';
                     if (currentPlaybackState === 'play') {
@@ -1162,14 +1218,35 @@ if ($dashboardBg !== '') {
                         if (sel) startPreviewLoopForItem(sel);
                     }
                 })
-                .catch(() => {});
+                .catch((error) => {
+                    pollErrorCount++;
+                    console.error('Poll error:', error.message);
+                    
+                    // If we get too many errors, stop polling temporarily
+                    if (pollErrorCount > 5) {
+                        console.warn('Too many poll errors, pausing polling for 30 seconds');
+                        setTimeout(() => {
+                            pollErrorCount = 0; // Reset error count
+                            pollPlaybackState(); // Try again
+                        }, 30000);
+                    }
+                });
         }
         
         // Function to update current video display
+        let updateErrorCount = 0;
         function updateCurrentVideoDisplay() {
-            fetch('api.php?action=get_current_video&' + profileQuery)
-                .then(res => res.json())
+            fetch('api.php?action=get_current_video&' + profileQuery, {
+                signal: AbortSignal.timeout(5000) // 5 second timeout
+            })
+                .then(res => {
+                    if (!res.ok) {
+                        throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+                    }
+                    return res.json();
+                })
                 .then(data => {
+                    updateErrorCount = 0; // Reset error count on success
                     const current = data.currentVideo;
                     if (current && (typeof current === 'object' || String(current).trim() !== '')) {
                         // Clear all playing highlights
@@ -1206,7 +1283,19 @@ if ($dashboardBg !== '') {
                         stopPreview();
                     }
                 })
-                .catch(() => {});
+                .catch((error) => {
+                    updateErrorCount++;
+                    console.error('Update display error:', error.message);
+                    
+                    // If we get too many errors, stop updating temporarily
+                    if (updateErrorCount > 5) {
+                        console.warn('Too many update errors, pausing updates for 30 seconds');
+                        setTimeout(() => {
+                            updateErrorCount = 0; // Reset error count
+                            updateCurrentVideoDisplay(); // Try again
+                        }, 30000);
+                    }
+                });
         }
         
         // Function to update video controls title with custom title and state-aware prefix
@@ -1440,21 +1529,12 @@ if ($dashboardBg !== '') {
         // Initial state check
         pollPlaybackState();
         updateCurrentVideoDisplay();
-        // Poll every 1 second to keep buttons in sync
-        setInterval(pollPlaybackState, 1000);
-        // Poll every 2 seconds to keep current video display in sync
-        setInterval(updateCurrentVideoDisplay, 2000);
+        // Poll every 3 seconds to keep buttons in sync (reduced from 1 second)
+        setInterval(pollPlaybackState, 3000);
+        // Poll every 5 seconds to keep current video display in sync (reduced from 2 seconds)
+        setInterval(updateCurrentVideoDisplay, 5000);
         
-        // Check for refresh signals from admin
-        setInterval(checkForRefreshSignal, 3000);
-        
-        function checkForRefreshSignal() {
-            fetch('api.php?action=check_refresh_signal&' + profileQuery).then(res => res.json()).then(data => {
-                if (data.should_refresh) {
-                    window.location.reload();
-                }
-            }).catch(() => {});
-        }
+        // Removed refresh signal checking - not needed and was causing unnecessary refreshes
         
 
     });

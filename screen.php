@@ -2,6 +2,9 @@
 // screen.php
 // Large display screen where the selected video is played.
 
+// Include shared state management
+require_once __DIR__ . '/state_manager.php';
+
 // Security headers
 header('X-Content-Type-Options: nosniff');
 header('X-Frame-Options: SAMEORIGIN');
@@ -13,9 +16,9 @@ $configPath = __DIR__ . '/config.json';
 if (file_exists($configPath)) {
     $config = json_decode(file_get_contents($configPath), true);
 } else {
-$config = [
-    'directory' => 'videos'
-];
+    $config = [
+        'directory' => 'videos'
+    ];
 }
 
 // Controls visibility (allow enabling via query param)
@@ -36,6 +39,7 @@ if (isset($_GET['nocontrols']) || isset($_GET['hide_controls'])) {
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Screen - Relax Media System</title>
+    <!-- External CSS file with all screen-specific styles -->
     <link rel="stylesheet" href="assets/style.css?v=<?php echo filemtime(__DIR__ . '/assets/style.css'); ?>">
 </head>
 <body>
@@ -47,12 +51,7 @@ if (isset($_GET['nocontrols']) || isset($_GET['hide_controls'])) {
         <div id="placeholder" class="placeholder" style="display:none;">Select a video from the dashboard to play.</div>
     </main>
     <?php if (!$showControls): ?>
-    <style>
-      /* Aggressively hide native controls across browsers when controls are disabled */
-      video.video-no-controls::-webkit-media-controls { display: none !important; }
-      video.video-no-controls::-webkit-media-controls-enclosure { display: none !important; }
-      video.video-no-controls::-moz-media-controls { display: none !important; }
-    </style>
+    <!-- Controls are disabled - styles handled by external CSS -->
     <?php endif; ?>
     <script>
     document.addEventListener('DOMContentLoaded', () => {
@@ -103,94 +102,100 @@ if (isset($_GET['nocontrols']) || isset($_GET['hide_controls'])) {
         
         // Screen timeout variables
         let screenTimeoutId = null;
-        let warningTimeoutId = null;
         let isScreenOff = false;
 
         // Function to start screen timeout when no video is playing
         function startScreenTimeout() {
             // Clear any existing timeouts
             if (screenTimeoutId) clearTimeout(screenTimeoutId);
-            if (warningTimeoutId) clearTimeout(warningTimeoutId);
             
-            // Set warning after 30 seconds
-            warningTimeoutId = setTimeout(() => {
-                if (!currentVideo && !isScreenOff) {
-                    showWarning("The screen will turn off in 30 seconds.");
-                }
-            }, 30000);
+            // Show placeholder
+            showPlaceholder();
             
-            // Turn off screen after 60 seconds total
+            // Turn off screen after 30 seconds total
             screenTimeoutId = setTimeout(() => {
                 if (!currentVideo && !isScreenOff) {
                     turnOffScreen();
                 }
-            }, 60000);
-        }
-        
-        // Function to show warning message
-        function showWarning(message) {
-            placeholder.innerHTML = `<div class="warning-message">⚠️ ${message}</div>`;
-            placeholder.style.display = 'block';
-            placeholder.style.borderColor = '#ff6b6b';
-            placeholder.style.color = '#ff6b6b';
+            }, 30000);
         }
         
         // Function to turn off screen
         function turnOffScreen() {
             isScreenOff = true;
-            videoEl.style.display = 'none';
-            placeholder.style.display = 'none';
-            document.body.style.backgroundColor = '#000';
-            document.body.style.cursor = 'none';
+            
+            // Add CSS classes for black screen - CSS handles all the styling
+            document.body.classList.add('screen-off');
+            document.documentElement.classList.add('screen-off');
+            
+            // Clear any remaining timeouts
+            if (screenTimeoutId) clearTimeout(screenTimeoutId);
+            
+            console.log('🖥️ Screen should now be completely black');
         }
         
         // Function to reset screen timeout
         function resetScreenTimeout() {
             if (screenTimeoutId) clearTimeout(screenTimeoutId);
-            if (warningTimeoutId) clearTimeout(warningTimeoutId);
             isScreenOff = false;
-            document.body.style.backgroundColor = '';
-            document.body.style.cursor = '';
+            
+            // Remove CSS classes - CSS handles all the styling restoration
+            document.body.classList.remove('screen-off');
+            document.documentElement.classList.remove('screen-off');
         }
         
         // Function to update video element with new source
         function loadVideo(filename, shouldPlay = false, dirIndex = 0) {
             if (!filename) {
                 videoEl.style.display = 'none';
-                placeholder.style.display = 'block';
+                showPlaceholder(); // Use the new function
                 videoEl.pause();
                 currentVideo = '';
                 // Start screen timeout when no video is loaded
                 startScreenTimeout();
                 return;
             }
-            // If same video is already playing, do nothing
-            if (filename === currentVideo) return;
+            // If same video is already loaded and playing state hasn't changed, do nothing
+            if (filename === currentVideo && !shouldPlay) {
+                return;
+            }
             const newSrc = 'video.php?file=' + encodeURIComponent(filename) + '&dirIndex=' + dirIndex;
             currentVideo = filename;
             sourceEl.src = newSrc;
             // For compatibility, set video src directly as well
             videoEl.src = newSrc;
-            placeholder.style.display = 'none';
+            
+            // Ensure video is visible - CSS classes handle the styling
+            hidePlaceholderCompletely(); // Hide placeholder completely
             videoEl.style.display = 'block';
+            videoEl.style.visibility = 'visible';
+            videoEl.style.opacity = '1';
+            
             videoEl.load();
             
-            // Reset screen timeout when video is loaded
-            resetScreenTimeout();
+            // Only reset screen timeout if this is a new video or if we're explicitly playing
+            if (shouldPlay) {
+                resetScreenTimeout();
+                // Ensure placeholder is completely hidden when video is playing
+                hidePlaceholderCompletely();
+            } else {
+                // If video is loaded but not playing, start screen timeout
+                startScreenTimeout();
+            }
             
-                    // Ensure loop is disabled when loading new video (will be set by poll function)
-        videoEl.loop = false;
+            // Ensure loop is disabled when loading new video (will be set by poll function)
+            videoEl.loop = false;
             
             // Only play if explicitly requested
             if (shouldPlay) {
                 const playVideo = () => {
-                    videoEl.play().catch(() => {
+                    videoEl.play().catch((err) => {
                         // Try again after a short delay
                         setTimeout(() => {
-                            videoEl.play().catch(() => {
+                            videoEl.play().catch((err2) => {
                                 // Try one more time with user interaction simulation
                                 videoEl.muted = true;
-                                videoEl.play().catch(() => {});
+                                videoEl.play().catch((err3) => {});
                             });
                         }, 100);
                     });
@@ -200,27 +205,59 @@ if (isset($_GET['nocontrols']) || isset($_GET['hide_controls'])) {
                 playVideo();
                 
                 // Also try when video is loaded
-                videoEl.addEventListener('loadeddata', playVideo, { once: true });
+                videoEl.addEventListener('loadeddata', () => {
+                    playVideo();
+                }, { once: true });
             }
-            
-
+        }
+        
+        // Function to completely hide the placeholder and counter
+        function hidePlaceholderCompletely() {
+            if (placeholder) {
+                // Apply CSS class for hiding - CSS handles all the styling
+                placeholder.classList.add('video-playing-hidden');
+                
+                // Force a reflow to ensure styles are applied
+                placeholder.offsetHeight;
+            }
+        }
+        
+        // Function to show the placeholder when needed
+        function showPlaceholder() {
+            if (placeholder) {
+                // Remove the hiding CSS class - CSS handles all the styling restoration
+                placeholder.classList.remove('video-playing-hidden');
+                
+                // Force a reflow to ensure styles are applied
+                placeholder.offsetHeight;
+            }
         }
 
         // Determine profile from URL: ?d=1 → dashboard1, ?dashboard=... or ?profile=...
         function getProfileQuery() {
             const params = new URLSearchParams(location.search);
+            let profileQuery = 'profile=default';
+            
             if (params.has('profile')) {
-                return 'profile=' + encodeURIComponent(params.get('profile'));
-            }
-            if (params.has('d')) {
+                profileQuery = 'profile=' + encodeURIComponent(params.get('profile'));
+            } else if (params.has('d')) {
                 const n = parseInt(params.get('d') || '0', 10);
-                if (n === 0) return 'profile=default';
-                if (n >= 1) return 'd=' + String(n);
+                if (n === 0) {
+                    profileQuery = 'profile=default';
+                } else if (n >= 1) {
+                    profileQuery = 'profile=dashboard' + String(n);
+                }
+            } else if (params.has('dashboard')) {
+                profileQuery = 'profile=' + encodeURIComponent(params.get('dashboard'));
             }
-            if (params.has('dashboard')) {
-                return 'profile=' + encodeURIComponent(params.get('dashboard'));
-            }
-            return 'profile=default';
+            
+            console.log('🔍 Profile detection:', {
+                url: location.search,
+                profileQuery: profileQuery,
+                params: Object.fromEntries(params.entries())
+            });
+            
+            return profileQuery;
         }
 
         // Start initial screen timeout if no video is loaded
@@ -228,561 +265,185 @@ if (isset($_GET['nocontrols']) || isset($_GET['hide_controls'])) {
             startScreenTimeout();
         }
         
-        // Poll server to check for updates
-        let isPolling = false; // Prevent overlapping polls
-        let pollTimeoutId = null; // Track timeout ID for cleanup
-        let consecutiveErrors = 0; // Track consecutive errors for recovery
-        let lastSuccessfulPoll = Date.now(); // Track last successful poll
+        // SIMPLIFIED POLLING SYSTEM
+        // Single efficient polling system
+        let isPolling = false;
+        let pollInterval = null;
+        let lastKnownState = '';
+        let pollTimeoutId = null;
         
-        async function poll() {
-            if (isPolling) {
-                console.log('Poll already in progress, skipping...');
-                return;
-            }
-            
+        // Single efficient polling function that gets everything at once
+        async function efficientPoll() {
+            if (isPolling) return;
             isPolling = true;
-            const profileQuery = getProfileQuery();
-            
-            // Clear any existing timeout before setting new one
-            if (pollTimeoutId) {
-                clearTimeout(pollTimeoutId);
-                pollTimeoutId = null;
-            }
-            
-            // Add timeout to prevent hanging requests
-            pollTimeoutId = setTimeout(() => {
-                isPolling = false;
-                pollTimeoutId = null;
-                console.log('Poll timeout, resetting...');
-                consecutiveErrors++;
-                attemptRecovery();
-            }, 10000); // 10 second timeout
             
             try {
-                // Fetch all data sequentially to avoid overwhelming the server
-                const videoRes = await fetch('api.php?action=get_current_video&' + profileQuery);
-                const videoData = await videoRes.json();
+                const profileQuery = getProfileQuery();
                 
-                const stateRes = await fetch('api.php?action=get_playback_state&' + profileQuery);
-                const stateData = await stateRes.json();
+                // Get all state in ONE API call instead of multiple calls
+                const changeRes = await fetch('api.php?action=check_changes&' + profileQuery, {
+                    signal: AbortSignal.timeout(3000) // Reduced timeout to 3 seconds
+                });
                 
-                const volumeRes = await fetch('api.php?action=get_volume&' + profileQuery);
-                const volumeData = await volumeRes.json();
+                if (!changeRes.ok) {
+                    throw new Error(`API failed: ${changeRes.status}`);
+                }
                 
-                const muteRes = await fetch('api.php?action=get_mute_state&' + profileQuery);
-                const muteData = await muteRes.json();
+                const changeData = await changeRes.json();
+                const currentStateHash = changeData.currentState.stateHash;
                 
-                const loopRes = await fetch('api.php?action=get_loop_mode&' + profileQuery);
-                const loopData = await loopRes.json();
+                // Only update if something actually changed
+                if (currentStateHash !== lastKnownState) {
+                    console.log('🔄 State changed, updating video and controls');
+                    lastKnownState = currentStateHash;
+                    
+                    // Apply all changes at once
+                    const state = changeData.currentState;
+                    
+                    // Update video if needed (including clearing video when empty)
+                    if (state.video !== currentVideo) {
+                        if (state.video) {
+                            console.log('📺 Loading new video:', state.video);
+                            loadVideo(state.video, state.playbackState === 'play', state.dirIndex);
+                        } else {
+                            console.log('📺 Clearing video (stop pressed)');
+                            loadVideo('', false, 0); // This will show black screen
+                        }
+                    }
+                    
+                    // Apply playback controls
+                    if (state.video && currentVideo === state.video) {
+                        applyPlaybackControls(state.playbackState);
+                    }
+                    
+                    // Apply volume and mute
+                    if (state.volume !== undefined) {
+                        videoEl.volume = state.volume / 100;
+                    }
+                    if (state.muted !== undefined) {
+                        videoEl.muted = state.muted;
+                    }
+                }
                 
-                const playAllRes = await fetch('api.php?action=get_play_all_mode&' + profileQuery);
-                const playAllData = await playAllRes.json();
-                
-                const externalRes = await fetch('api.php?action=get_external_audio_mode&' + profileQuery);
-                const externalData = await externalRes.json();
-                
-                // Handle both string and object formats for backward compatibility
-                const currentVideoData = videoData.currentVideo;
-                const filename = typeof currentVideoData === 'string' ? currentVideoData : (currentVideoData?.filename || '');
-                const dirIndex = typeof currentVideoData === 'string' ? 0 : (currentVideoData?.dirIndex || 0);
-                const playbackState = stateData.state;
-                
-                // Only load video if there's a filename, and only play if state is 'play'
-                if (filename) {
-                    loadVideo(filename, playbackState === 'play', dirIndex);
-                    // Ensure video is paused when first loaded (unless explicitly playing)
-                    if (playbackState !== 'play') {
+            } catch (err) {
+                console.log('⚠️ Poll error:', err.message);
+                // Don't retry immediately on error
+            } finally {
+                isPolling = false;
+            }
+        }
+        
+        // Function to apply playback controls
+        function applyPlaybackControls(playbackState) {
+            switch (playbackState) {
+                case 'play':
+                    if (videoEl.paused) {
+                        console.log('▶️ Starting video playback');
+                        videoEl.play().catch(err => console.log('Play failed:', err));
+                        resetScreenTimeout();
+                        if (!window.fullscreenAttempted) {
+                            setTimeout(attemptAutoFullscreen, 500);
+                            window.fullscreenAttempted = true;
+                        }
+                    }
+                    break;
+                case 'pause':
+                    if (!videoEl.paused) {
+                        console.log('⏸️ Pausing video');
                         videoEl.pause();
+                        startScreenTimeout();
                     }
-                } else {
-                    loadVideo(''); // Clear video
-                }
-                
-                // Handle playback controls for already loaded video
-                if (filename && videoEl.src && currentVideo === filename) {
-                    switch (playbackState) {
-                        case 'play':
-                            videoEl.play().catch(err => console.log('Play failed:', err));
-                            // Enter fullscreen when play is requested (only once)
-                            if (!window.fullscreenAttempted) {
-                                // Use a single timeout instead of multiple
-                                const fullscreenTimeout = setTimeout(() => {
-                                    enterFullscreen();
-                                    window.fullscreenAttempted = true;
-                                }, 50);
-                                // Store timeout ID for cleanup
-                                window.fullscreenTimeoutId = fullscreenTimeout;
-                            }
-                            break;
-                        case 'pause':
-                            videoEl.pause();
-                            break;
-                        case 'stop':
-                            videoEl.pause();
-                            videoEl.currentTime = 0;
-                            break;
+                    break;
+                case 'stop':
+                    if (!videoEl.paused || videoEl.currentTime !== 0) {
+                        console.log('⏹️ Stopping video');
+                        videoEl.pause();
+                        videoEl.currentTime = 0;
+                        startScreenTimeout();
                     }
-                } else if (filename && playbackState === 'play') {
-                    // If this is a new video that should be playing, enter fullscreen after loading
-                    if (!window.fullscreenAttempted) {
-                        const fullscreenTimeout = setTimeout(() => {
-                            if (!videoEl.paused && !videoEl.muted) {
-                                enterFullscreen();
-                                window.fullscreenAttempted = true;
-                            }
-                        }, 1000);
-                        // Store timeout ID for cleanup
-                        window.fullscreenTimeoutId = fullscreenTimeout;
-                    }
-                }
-                
-                // Apply volume setting
-                if (volumeData.volume !== undefined) {
-                    videoEl.volume = volumeData.volume / 100;
-                }
-                
-                // Apply mute setting (force mute if external audio mode is on)
-                if (muteData.muted !== undefined) {
-                    const forceMute = externalData && externalData.external === 'on';
-                    videoEl.muted = forceMute ? true : muteData.muted;
-                }
-                
-                // Apply loop setting (disable video loop if play all is enabled)
-                if (loopData.loop !== undefined && playAllData.play_all !== undefined) {
-                    // Only enable video loop if play all is disabled
-                    const shouldLoop = (loopData.loop === 'on' && playAllData.play_all === 'off');
-                    console.log('🎯 Loop setting - loop mode:', loopData.loop, 'play all mode:', playAllData.play_all, 'should loop:', shouldLoop);
-                    console.log('🎯 Setting videoEl.loop to:', shouldLoop);
-                    videoEl.loop = shouldLoop;
-                    console.log('🎯 videoEl.loop is now:', videoEl.loop);
-                }
-                
-                // Reset error counter on successful poll
-                consecutiveErrors = 0;
-                lastSuccessfulPoll = Date.now();
-                
-                // Clear timeout and reset polling flag on success
-                if (pollTimeoutId) {
-                    clearTimeout(pollTimeoutId);
-                    pollTimeoutId = null;
-                }
-                isPolling = false;
-                
-            } catch (err) { 
-                console.error('Poll error:', err);
-                consecutiveErrors++;
-                
-                // Clear timeout and reset polling flag on error
-                if (pollTimeoutId) {
-                    clearTimeout(pollTimeoutId);
-                    pollTimeoutId = null;
-                }
-                isPolling = false;
-                
-                // Add error recovery - reset fullscreen flag on errors
-                window.fullscreenAttempted = false;
-                
-                // Attempt recovery if we have multiple consecutive errors
-                if (consecutiveErrors >= 3) {
-                    attemptRecovery();
-                }
+                    break;
             }
         }
         
-        // Function to attempt recovery when API calls are failing
-        function attemptRecovery() {
-            console.log('🔄 Attempting API recovery...');
-            
-            // Test health endpoint first
-            fetch('api.php?action=health')
-                .then(res => res.json())
-                .then(health => {
-                    console.log('✅ Health check successful:', health);
-                    consecutiveErrors = 0;
-                    
-                    // If health is good but we still have issues, try a fresh poll
-                    if (Date.now() - lastSuccessfulPoll > 30000) { // 30 seconds
-                        console.log('🔄 Attempting fresh poll after recovery...');
-                        setTimeout(poll, 1000);
-                    }
-                })
-                .catch(err => {
-                    console.error('❌ Health check failed:', err);
-                    // If health check fails, the server might be down
-                    // Wait longer before retrying
-                    setTimeout(() => {
-                        console.log('🔄 Retrying after health check failure...');
-                        consecutiveErrors = Math.max(0, consecutiveErrors - 1);
-                    }, 30000); // Wait 30 seconds
-                });
-        }
+        // Start efficient polling - every 2 seconds for responsive control
+        pollInterval = setInterval(efficientPoll, 2000);
         
-        // Function to detect and fix memory leaks
-        function detectMemoryLeaks() {
-            // Check for stuck intervals
-            if (isVolumePolling && !volumePollInterval) {
-                console.warn('🚨 Memory leak detected: volume polling stuck');
-                isVolumePolling = false;
-            }
-            if (isMutePolling && !mutePollInterval) {
-                console.warn('🚨 Memory leak detected: mute polling stuck');
-                isMutePolling = false;
-            }
-            if (isPolling && !pollTimeoutId) {
-                console.warn('🚨 Memory leak detected: main polling stuck');
-                isPolling = false;
-            }
-            
-            // Check for stuck fullscreen timeouts
-            if (window.fullscreenTimeoutId && !window.fullscreenAttempted) {
-                console.warn('🚨 Memory leak detected: fullscreen timeout stuck');
-                clearTimeout(window.fullscreenTimeoutId);
-                window.fullscreenTimeoutId = null;
-            }
-            
-            // Enhanced memory monitoring with fallback
-            let memoryInfo = null;
-            
-            // Try multiple memory monitoring approaches
-            if (console.memory) {
-                try {
-                    const mem = console.memory;
-                    const usedBytes = mem.usedJSHeapSize || 0;
-                    const totalBytes = mem.totalJSHeapSize || 0;
-                    const limitBytes = mem.jsHeapSizeLimit || 0;
-                    
-                    // Only use if values seem reasonable (not 0 or extremely small)
-                    if (usedBytes > 1024 && totalBytes > 1024 && limitBytes > 1024) {
-                        memoryInfo = {
-                            used: Math.round(usedBytes / 1024 / 1024),
-                            total: Math.round(totalBytes / 1024 / 1024),
-                            limit: Math.round(limitBytes / 1024 / 1024),
-                            source: 'console.memory'
-                        };
-                    }
-                } catch (e) {
-                    console.log('console.memory error:', e);
-                }
-            }
-            
-            // Fallback: estimate memory usage based on performance
-            if (!memoryInfo) {
-                try {
-                    const startTime = performance.now();
-                    // Create a small object to measure memory pressure
-                    const testArray = new Array(1000).fill('test');
-                    const endTime = performance.now();
-                    const timeDiff = endTime - startTime;
-                    
-                    // Rough estimate based on performance (not accurate but gives relative sense)
-                    memoryInfo = {
-                        used: Math.round(timeDiff * 10), // Rough estimate
-                        total: 100, // Placeholder
-                        limit: 100, // Placeholder
-                        source: 'performance.estimate',
-                        note: 'Rough estimate - actual values may vary'
-                    };
-                    
-                    // Clean up test array
-                    testArray.length = 0;
-                } catch (e) {
-                    console.log('Performance estimate error:', e);
-                }
-            }
-            
-            // Log memory status
-            if (memoryInfo) {
-                const usagePercent = memoryInfo.limit > 0 ? Math.round((memoryInfo.used / memoryInfo.limit) * 100) : 0;
-                
-                console.log('📊 Memory Status:', {
-                    used: memoryInfo.used + 'MB',
-                    total: memoryInfo.total + 'MB', 
-                    limit: memoryInfo.limit + 'MB',
-                    usage: usagePercent + '%',
-                    source: memoryInfo.source,
-                    timestamp: new Date().toISOString()
-                });
-                
-                // Check for critical memory usage
-                if (memoryInfo.used > 100 && memoryInfo.source === 'console.memory') {
-                    console.error('🚨 Critical memory usage:', memoryInfo.used + 'MB used');
-                    
-                    // Force cleanup and restart polling
-                    cleanup();
-                    setTimeout(() => {
-                        startVolumePolling();
-                        startMutePolling();
-                        poll();
-                    }, 1000);
-                }
-            } else {
-                console.log('📊 Memory monitoring not available');
-            }
-            
-            // Check for excessive DOM nodes or event listeners
-            const videoCount = document.querySelectorAll('video').length;
-            const audioCount = document.querySelectorAll('audio').length;
-            const iframeCount = document.querySelectorAll('iframe').length;
-            
-            if (videoCount > 1 || audioCount > 1 || iframeCount > 1) {
-                console.warn('🚨 Multiple media elements detected:', {
-                    videos: videoCount,
-                    audios: audioCount,
-                    iframes: iframeCount
-                });
-            }
-            
-            // Check for stuck network requests
-            const now = Date.now();
-            const timeSinceLastPoll = now - lastSuccessfulPoll;
-            if (timeSinceLastPoll > 60000) { // More than 1 minute
-                console.warn('🚨 No successful polls in', Math.round(timeSinceLastPoll / 1000), 'seconds');
-                
-                // Force a fresh poll
-                if (!isPolling) {
-                    console.log('🔄 Forcing fresh poll due to inactivity...');
-                    poll();
-                }
-            }
-        }
+        // Initial poll after 1 second
+        setTimeout(efficientPoll, 1000);
         
-        // Function to test for memory leaks
-        function testMemoryLeaks() {
-            console.log('🧪 Running memory leak test...');
-            
-            // Test 1: Check if intervals are properly managed
-            console.log('📊 Interval Status:', {
-                volumePollInterval: !!volumePollInterval,
-                mutePollInterval: !!mutePollInterval,
-                pollInterval: !!pollInterval,
-                isVolumePolling,
-                isMutePolling,
-                isPolling
-            });
-            
-            // Test 2: Check if timeouts are properly managed
-            console.log('📊 Timeout Status:', {
-                pollTimeoutId: !!pollTimeoutId,
-                fullscreenTimeoutId: !!window.fullscreenTimeoutId,
-                fullscreenAttempted: window.fullscreenAttempted
-            });
-            
-            // Test 3: Check memory usage
-            if (console.memory) {
-                const mem = console.memory;
-                console.log('📊 Memory Status:', {
-                    used: Math.round(mem.usedJSHeapSize / 1024 / 1024) + 'MB',
-                    total: Math.round(mem.totalJSHeapSize / 1024 / 1024) + 'MB',
-                    limit: Math.round(mem.jsHeapSizeLimit / 1024 / 1024) + 'MB'
-                });
-            }
-            
-            // Test 4: Check DOM elements
-            const videoCount = document.querySelectorAll('video').length;
-            const audioCount = document.querySelectorAll('audio').length;
-            console.log('📊 DOM Elements:', { videos: videoCount, audios: audioCount });
-            
-            // Test 5: Check if any fetch requests are hanging
-            console.log('📊 Fetch Status:', {
-                activeRequests: window.activeRequests || 0,
-                lastPollTime: new Date(lastSuccessfulPoll).toISOString(),
-                consecutiveErrors
-            });
-        }
-        
-        // Expose test function globally for debugging
-        window.testMemoryLeaks = testMemoryLeaks;
-        window.forceCleanup = cleanup;
-        
-        // Initial poll
-        poll();
-        // Poll every 3 seconds instead of 2 to reduce load
-        const pollInterval = setInterval(poll, 3000);
-
-        // Fast volume update path: long-poll for volume signal and apply immediately
-        let volumePollInterval = null;
-        let isVolumePolling = false;
-        
-        function startVolumePolling() {
-            if (volumePollInterval) {
-                clearInterval(volumePollInterval);
-                volumePollInterval = null;
-            }
-            
-            if (isVolumePolling) {
-                return; // Already polling
-            }
-            
-            isVolumePolling = true;
-            const profileQuery = getProfileQuery();
-            
-            // Use setInterval instead of recursive setTimeout to prevent memory leaks
-            volumePollInterval = setInterval(async () => {
-                try {
-                    const res = await fetch('api.php?action=check_volume_signal&' + profileQuery);
-                    const sig = await res.json();
-                    
-                    // When there's a (new) signal timestamp, fetch latest volume immediately
-                    if (sig && sig.volume_signal) {
-                        try {
-                            const volRes = await fetch('api.php?action=get_volume&' + profileQuery);
-                            const volData = await volRes.json();
-                            if (volData && typeof volData.volume === 'number') {
-                                videoEl.volume = volData.volume / 100;
-                            }
-                        } catch (volErr) {
-                            console.log('Volume fetch error:', volErr);
-                        }
-                    }
-                } catch (err) {
-                    console.log('Volume signal check error:', err);
-                    // Stop polling on error to prevent infinite error loops
-                    stopVolumePolling();
-                }
-            }, 400); // ~2.5x per second
-        }
-        
-        function stopVolumePolling() {
-            if (volumePollInterval) {
-                clearInterval(volumePollInterval);
-                volumePollInterval = null;
-            }
-            isVolumePolling = false;
-        }
-        
-        // Start volume polling
-        startVolumePolling();
-
-        // Fast mute update path
-        let mutePollInterval = null;
-        let isMutePolling = false;
-        
-        function startMutePolling() {
-            if (mutePollInterval) {
-                clearInterval(mutePollInterval);
-                mutePollInterval = null;
-            }
-            
-            if (isMutePolling) {
-                return; // Already polling
-            }
-            
-            isMutePolling = true;
-            const profileQuery = getProfileQuery();
-            
-            // Use setInterval instead of recursive setTimeout to prevent memory leaks
-            mutePollInterval = setInterval(async () => {
-                try {
-                    const res = await fetch('api.php?action=check_mute_signal&' + profileQuery);
-                    const sig = await res.json();
-                    
-                    if (sig && sig.mute_signal) {
-                        try {
-                            const [muteRes, externalRes] = await Promise.all([
-                                fetch('api.php?action=get_mute_state&' + profileQuery),
-                                fetch('api.php?action=get_external_audio_mode&' + profileQuery)
-                            ]);
-                            
-                            const muteData = await muteRes.json();
-                            const externalData = await externalRes.json();
-                            
-                            const forceMute = externalData && externalData.external === 'on';
-                            if (muteData && typeof muteData.muted !== 'undefined') {
-                                videoEl.muted = forceMute ? true : !!muteData.muted;
-                            }
-                        } catch (muteErr) {
-                            console.log('Mute fetch error:', muteErr);
-                        }
-                    }
-                } catch (err) {
-                    console.log('Mute signal check error:', err);
-                    // Stop polling on error to prevent infinite error loops
-                    stopMutePolling();
-                }
-            }, 400);
-        }
-        
-        function stopMutePolling() {
-            if (mutePollInterval) {
-                clearInterval(mutePollInterval);
-                mutePollInterval = null;
-            }
-            isMutePolling = false;
-        }
-        
-        // Start mute polling
-        startMutePolling();
-        
-        // Try immediate fullscreen for TV/monitor browsers (only once)
+        // Try immediate fullscreen for TV/monitor browsers (Philips monitor)
         if (!window.fullscreenAttempted) {
             setTimeout(() => {
-                console.log('Attempting immediate fullscreen for TV/monitor');
-                enterFullscreen();
+                attemptAutoFullscreen();
                 window.fullscreenAttempted = true;
             }, 1000);
         }
         
-        // Try to enter fullscreen on page load if video is playing (for TV/monitor browsers)
+        // Check initial playback state and attempt automatic fullscreen
         setTimeout(() => {
-            // Check if there's a video playing and try to enter fullscreen
+            // Check if there's a video playing
+            const profileQuery = getProfileQuery();
             fetch('api.php?action=get_playback_state&' + profileQuery).then(res => res.json()).then(data => {
                 if (data.state === 'play' && currentVideo && !window.fullscreenAttempted) {
-                    console.log('Video is playing, attempting fullscreen for TV/monitor');
-                    // Only try once to prevent multiple attempts
-                    setTimeout(enterFullscreen, 1000);
+                    // Try automatic fullscreen for Philips monitor
+                    setTimeout(attemptAutoFullscreen, 500);
                     window.fullscreenAttempted = true;
                 }
-            }).catch(err => console.log('Failed to check initial playback state:', err));
+            }).catch(err => {});
         }, 2000); // Wait 2 seconds after page load
         
         // Try to play video when window gains focus (helps with second monitor)
         window.addEventListener('focus', () => {
             if (currentVideo && videoEl.paused) {
-                videoEl.play().catch(err => console.log('Focus autoplay failed:', err));
+                videoEl.play().catch(err => {});
+            }
+            
+            // Try fullscreen when window gains focus (sometimes works on TV browsers)
+            if (currentVideo && !document.fullscreenElement && !window.fullscreenAttempted) {
+                setTimeout(attemptAutoFullscreen, 1000);
+                window.fullscreenAttempted = true;
             }
         });
         
         // Also try when the page becomes visible
         document.addEventListener('visibilitychange', () => {
             if (!document.hidden && currentVideo && videoEl.paused) {
-                videoEl.play().catch(err => console.log('Visibility autoplay failed:', err));
+                videoEl.play().catch(err => {});
             }
+            
+            // Try fullscreen when page becomes visible (sometimes works on TV browsers)
+            if (!document.hidden && currentVideo && !document.fullscreenElement && !window.fullscreenAttempted) {
+                setTimeout(attemptAutoFullscreen, 1000);
+                window.fullscreenAttempted = true;
+            }
+        });
+        
+        // Clean up all intervals when page is unloaded to prevent memory leaks
+        window.addEventListener('beforeunload', () => {
+            cleanup();
         });
         
         // Handle video end event for play all mode
         videoEl.addEventListener('ended', () => {
-            console.log('🎬 VIDEO ENDED EVENT FIRED');
-            console.log('Current video element loop property:', videoEl.loop);
-            console.log('Current video filename:', currentVideo);
-            console.log('Video element src:', videoEl.src);
-            console.log('Video element currentTime:', videoEl.currentTime);
-            console.log('Video element duration:', videoEl.duration);
+
             
             // Get profile query for this event handler
             const profileQuery = getProfileQuery();
-            console.log('🎯 Profile query for ended event:', profileQuery);
             
             // Check both play all mode and loop mode
             Promise.all([
                 fetch('api.php?action=get_play_all_mode&' + profileQuery).then(res => res.json()),
                 fetch('api.php?action=get_loop_mode&' + profileQuery).then(res => res.json())
             ]).then(([playAllData, loopData]) => {
-                console.log('Play all mode:', playAllData.play_all, 'Loop mode:', loopData.loop);
-                console.log('Video element loop property after check:', videoEl.loop);
-                
                 if (playAllData.play_all === 'on') {
-                    console.log('🚀 Play all mode enabled, checking if we should move to next video');
                     // Get the next video in the playlist
                     fetch('api.php?action=get_next_video&' + profileQuery).then(res => res.json()).then(nextData => {
-                        console.log('📺 Next video API response:', nextData);
                         // Handle both string and object formats for backward compatibility
                         const nextVideoData = nextData.nextVideo;
                         const nextVideoName = typeof nextVideoData === 'string' ? nextVideoData : (nextVideoData?.name || '');
                         const nextVideoDirIndex = typeof nextVideoData === 'string' ? 0 : (nextVideoData?.dirIndex || 0);
                         
-                        console.log('🔄 Next video:', nextVideoName, 'Current video:', currentVideo);
                         if (nextVideoName && nextVideoName !== currentVideo) {
-                            console.log('✅ Moving to next video:', nextVideoName);
                             // Set the next video as current
                             const formData = new FormData();
                             formData.append('filename', nextVideoName);
@@ -791,84 +452,158 @@ if (isset($_GET['nocontrols']) || isset($_GET['hide_controls'])) {
                                 method: 'POST',
                                 body: formData
                             }).then(() => {
-                                console.log('✅ Current video updated, loading next video');
                                 // Load and play the next video
                                 loadVideo(nextVideoName, true, nextVideoDirIndex);
                             });
                         } else {
-                            console.log('⏹️ No next video available or reached end of playlist');
                             // Reached end of playlist, stop playback
                             fetch('api.php?action=stop_video&' + profileQuery, { method: 'POST' })
                                 .then(res => res.json())
                                 .then(() => {
-                                    console.log('⏹️ Playback stopped at end of playlist');
                                     videoEl.pause();
                                     videoEl.currentTime = 0;
                                 })
-                                .catch(err => console.log('❌ Failed to set stop state on end:', err));
+                                .catch(err => {});
                         }
-                    }).catch(err => console.log('❌ Failed to get next video:', err));
+                    }).catch(err => {});
                 } else if (loopData.loop === 'on') {
-                    console.log('🔄 Loop mode enabled, restarting current video');
                     // Just restart the current video (loop is handled by video element)
                     videoEl.currentTime = 0;
-                    videoEl.play().catch(err => console.log('❌ Loop restart failed:', err));
+                    videoEl.play().catch(err => {});
                 } else {
-                    console.log('⏹️ No loop or play all enabled, video will stop');
                     // Ensure global playback state reflects stop to avoid accidental restarts
                     fetch('api.php?action=stop_video&' + profileQuery, { method: 'POST' })
                         .then(res => res.json())
                         .then(() => {
-                            console.log('⏹️ Playback stopped (no loop/play all)');
                             // Reset the player UI locally as well
                             videoEl.pause();
                             videoEl.currentTime = 0;
                         })
-                        .catch(err => console.log('❌ Failed to set stop state on end:', err));
+                        .catch(err => {});
                 }
-            }).catch(err => console.log('Failed to check play all/loop mode:', err));
+            }).catch(err => {});
         });
         
-        // Function to show fullscreen prompt
-        function showFullscreenPrompt() {
+        // Function to attempt automatic fullscreen without user interaction (for Philips monitor)
+        function attemptAutoFullscreen() {
+            if (document.fullscreenElement) {
+                console.log('✅ Already in fullscreen mode');
+                return;
+            }
+            
+            console.log('🎬 Attempting automatic fullscreen for Philips monitor');
+            
+            // Reset fullscreen attempt flag to allow retries
+            window.fullscreenAttempted = false;
+            
+            // Method 1: Try video element fullscreen first
+            if (videoEl.requestFullscreen) {
+                console.log('🎬 Trying standard video fullscreen');
+                videoEl.requestFullscreen().then(() => {
+                    console.log('✅ Video fullscreen successful');
+                    window.fullscreenAttempted = true;
+                }).catch(err => {
+                    console.log('❌ Video fullscreen failed, trying document fullscreen:', err);
+                    attemptDocumentFullscreen();
+                });
+            } else if (videoEl.webkitRequestFullscreen) {
+                console.log('🎬 Trying webkit video fullscreen');
+                videoEl.webkitRequestFullscreen().then(() => {
+                    console.log('✅ Webkit video fullscreen successful');
+                    window.fullscreenAttempted = true;
+                }).catch(err => {
+                    console.log('❌ Webkit video fullscreen failed, trying document fullscreen:', err);
+                    attemptDocumentFullscreen();
+                });
+            } else if (videoEl.webkitEnterFullscreen) {
+                console.log('🎬 Trying webkit enter fullscreen');
+                videoEl.webkitEnterFullscreen().then(() => {
+                    console.log('✅ Webkit enter fullscreen successful');
+                    window.fullscreenAttempted = true;
+                }).catch(err => {
+                    console.log('❌ Webkit enter fullscreen failed, trying document fullscreen:', err);
+                    attemptDocumentFullscreen();
+                });
+            } else if (videoEl.mozRequestFullScreen) {
+                console.log('🎬 Trying mozilla video fullscreen');
+                videoEl.mozRequestFullScreen().then(() => {
+                    console.log('✅ Mozilla video fullscreen successful');
+                    window.fullscreenAttempted = true;
+                }).catch(err => {
+                    console.log('❌ Mozilla video fullscreen failed, trying document fullscreen:', err);
+                    attemptDocumentFullscreen();
+                });
+            } else if (videoEl.msRequestFullscreen) {
+                console.log('🎬 Trying MS video fullscreen');
+                videoEl.msRequestFullscreen().then(() => {
+                    console.log('✅ MS video fullscreen successful');
+                    window.fullscreenAttempted = true;
+                }).catch(err => {
+                    console.log('❌ MS video fullscreen failed, trying document fullscreen:', err);
+                    attemptDocumentFullscreen();
+                });
+            } else {
+                console.log('🎬 Video fullscreen not supported, trying document fullscreen');
+                attemptDocumentFullscreen();
+            }
+        }
+        
+        // Function to attempt document fullscreen as fallback
+        function attemptDocumentFullscreen() {
+            if (document.fullscreenElement) {
+                console.log('✅ Already in document fullscreen mode');
+                return;
+            }
+            
+            console.log('🎬 Attempting document fullscreen as fallback');
+            
+            if (document.documentElement.requestFullscreen) {
+                console.log('🎬 Trying standard document fullscreen');
+                document.documentElement.requestFullscreen().then(() => {
+                    console.log('✅ Document fullscreen successful');
+                    window.fullscreenAttempted = true;
+                }).catch(err => {
+                    console.log('❌ Document fullscreen failed:', err);
+                    attemptLegacyFullscreen();
+                });
+            } else if (document.documentElement.webkitRequestFullscreen) {
+                console.log('🎬 Trying webkit document fullscreen');
+                document.documentElement.webkitRequestFullscreen().then(() => {
+                    console.log('✅ Webkit document fullscreen successful');
+                    window.fullscreenAttempted = true;
+                }).catch(err => {
+                    console.log('❌ Webkit document fullscreen failed:', err);
+                    attemptLegacyFullscreen();
+                });
+            } else {
+                console.log('🎬 Document fullscreen not supported, trying legacy methods');
+                attemptLegacyFullscreen();
+            }
+        }
+        
+        // Function to attempt legacy fullscreen methods
+        function attemptLegacyFullscreen() {
             if (document.fullscreenElement) {
                 return; // Already in fullscreen
             }
             
-            // Create fullscreen prompt overlay
-            const prompt = document.createElement('div');
-            prompt.id = 'fullscreen-prompt';
-            prompt.innerHTML = `
-                <div class="fullscreen-prompt-content">
-                    <h3>🎬 Video Ready</h3>
-                    <p>Click anywhere to enter fullscreen mode</p>
-                    <button class="btn primary" onclick="enterFullscreenFromPrompt()">Enter Fullscreen</button>
-                    <button class="btn secondary" onclick="dismissFullscreenPrompt()">Skip</button>
-                </div>
-            `;
-            document.body.appendChild(prompt);
+            console.log('Attempting legacy fullscreen methods');
             
-            // Auto-hide after 10 seconds
-            setTimeout(() => {
-                if (document.getElementById('fullscreen-prompt')) {
-                    dismissFullscreenPrompt();
+            // Try legacy methods that sometimes work on TV browsers
+            try {
+                if (document.documentElement.webkitEnterFullscreen) {
+                    document.documentElement.webkitEnterFullscreen();
+                } else if (document.documentElement.mozRequestFullScreen) {
+                    document.documentElement.mozRequestFullScreen();
+                } else if (document.documentElement.msRequestFullscreen) {
+                    document.documentElement.msRequestFullscreen();
+                } else {
+                    console.log('All fullscreen methods failed');
                 }
-            }, 10000);
-        }
-        
-        // Function to dismiss fullscreen prompt
-        function dismissFullscreenPrompt() {
-            const prompt = document.getElementById('fullscreen-prompt');
-            if (prompt) {
-                prompt.remove();
+            } catch (err) {
+                console.log('Legacy fullscreen failed:', err);
             }
         }
-        
-        // Function to enter fullscreen from prompt (global function)
-        window.enterFullscreenFromPrompt = function() {
-            dismissFullscreenPrompt();
-            enterFullscreen();
-        };
         
         // Function to enter fullscreen (optimized for TV/monitor browsers)
         function enterFullscreen() {
@@ -920,28 +655,51 @@ if (isset($_GET['nocontrols']) || isset($_GET['hide_controls'])) {
                 if (document.fullscreenElement) {
                     exitFullscreen();
                 } else {
-                    enterFullscreen();
+                    // Use a small delay to ensure the keydown event is fully processed
+                    setTimeout(enterFullscreen, 50);
                 }
             }
         });
         
         // Try to enter fullscreen when video starts playing (for TV/monitor browsers)
         videoEl.addEventListener('play', () => {
+            console.log('🎬 Video started playing, keeping polling active for dashboard controls');
+            // Keep polling active to respond to dashboard controls (play/pause/stop)
+            // Only pause the main video loading poll, keep control polling active
+            
             // Only try fullscreen if video is actually playing and not muted
             if (!videoEl.paused && !videoEl.muted && !window.fullscreenAttempted) {
-                // Only try once to prevent multiple attempts
-                setTimeout(enterFullscreen, 500);
+                console.log('Video started playing, attempting automatic fullscreen for Philips monitor');
+                // Try automatic fullscreen for Philips monitor
+                setTimeout(attemptAutoFullscreen, 500);
                 window.fullscreenAttempted = true;
+            }
+        });
+        
+        // Resume full polling when video pauses or stops
+        videoEl.addEventListener('pause', () => {
+            console.log('⏸️ Video paused, resuming full polling');
+            if (!pollInterval) {
+                pollInterval = setInterval(efficientPoll, 2000);
+            }
+        });
+        
+        videoEl.addEventListener('ended', () => {
+            console.log('⏹️ Video ended, resuming full polling');
+            if (!pollInterval) {
+                pollInterval = setInterval(efficientPoll, 2000);
             }
         });
         
         // Try to enter fullscreen when video is loaded and ready (for TV/monitor browsers)
         videoEl.addEventListener('loadeddata', () => {
             // Check if video should be playing
+            const profileQuery = getProfileQuery();
             fetch('api.php?action=get_playback_state&' + profileQuery).then(res => res.json()).then(data => {
                 if (data.state === 'play' && !videoEl.paused && !videoEl.muted && !window.fullscreenAttempted) {
-                    console.log('Video loaded and should be playing, attempting fullscreen for TV/monitor');
-                    setTimeout(enterFullscreen, 300);
+                    console.log('Video loaded and should be playing, attempting automatic fullscreen for Philips monitor');
+                    // Try automatic fullscreen for Philips monitor
+                    setTimeout(attemptAutoFullscreen, 500);
                     window.fullscreenAttempted = true;
                 }
             }).catch(err => console.log('Failed to check playback state on video load:', err));
@@ -952,7 +710,8 @@ if (isset($_GET['nocontrols']) || isset($_GET['hide_controls'])) {
             if (document.fullscreenElement) {
                 exitFullscreen();
             } else {
-                enterFullscreen();
+                // Use a small delay to ensure the click event is fully processed
+                setTimeout(enterFullscreen, 50);
             }
         });
         
@@ -961,6 +720,7 @@ if (isset($_GET['nocontrols']) || isset($_GET['hide_controls'])) {
             // Only try to enter fullscreen if video is playing and not already in fullscreen
             if (currentVideo && !videoEl.paused && !document.fullscreenElement) {
                 console.log('Page clicked, entering fullscreen');
+                // Use a small delay to ensure the click event is fully processed
                 setTimeout(enterFullscreen, 100);
             }
         }, { once: true }); // Only trigger once per page load
@@ -968,16 +728,9 @@ if (isset($_GET['nocontrols']) || isset($_GET['hide_controls'])) {
         // Cleanup function to prevent memory leaks
         function cleanup() {
             // Clear all intervals
-            if (volumePollInterval) {
-                clearInterval(volumePollInterval);
-                volumePollInterval = null;
-            }
-            if (mutePollInterval) {
-                clearInterval(mutePollInterval);
-                mutePollInterval = null;
-            }
             if (pollInterval) {
                 clearInterval(pollInterval);
+                pollInterval = null;
             }
             
             // Clear all timeouts
@@ -985,24 +738,15 @@ if (isset($_GET['nocontrols']) || isset($_GET['hide_controls'])) {
                 clearTimeout(pollTimeoutId);
                 pollTimeoutId = null;
             }
-            if (window.fullscreenTimeoutId) {
-                clearTimeout(window.fullscreenTimeoutId);
-                window.fullscreenTimeoutId = null;
-            }
             
             // Reset all flags
             isPolling = false;
-            isVolumePolling = false;
-            isMutePolling = false;
             window.fullscreenAttempted = false;
             
             // Force garbage collection if available
             if (window.gc) {
                 window.gc();
-                console.log('🧹 Garbage collection triggered');
             }
-            
-            console.log('🧹 Cleanup completed');
         }
         
         // Cleanup on page unload
@@ -1012,13 +756,9 @@ if (isset($_GET['nocontrols']) || isset($_GET['hide_controls'])) {
         document.addEventListener('visibilitychange', () => {
             if (document.hidden) {
                 // Pause polling when page is hidden to save resources
-                if (volumePollInterval) {
-                    clearInterval(volumePollInterval);
-                    volumePollInterval = null;
-                }
-                if (mutePollInterval) {
-                    clearInterval(mutePollInterval);
-                    mutePollInterval = null;
+                if (pollInterval) {
+                    clearInterval(pollInterval);
+                    pollInterval = null;
                 }
                 if (pollTimeoutId) {
                     clearTimeout(pollTimeoutId);
@@ -1026,190 +766,44 @@ if (isset($_GET['nocontrols']) || isset($_GET['hide_controls'])) {
                 }
             } else {
                 // Resume polling when page becomes visible
-                if (!volumePollInterval) startVolumePolling();
-                if (!mutePollInterval) startMutePolling();
-                if (!pollTimeoutId && !isPolling) poll(); // Resume polling if it was paused
+                if (!pollInterval) {
+                    pollInterval = setInterval(efficientPoll, 2000);
+                }
+                if (!pollTimeoutId && !isPolling) efficientPoll(); // Resume polling if it was paused
             }
         });
         
-        // Periodic cleanup to prevent timeout accumulation
-        setInterval(() => {
+        // Simplified periodic cleanup and health monitoring (combined to avoid redundancy)
+        setInterval(async () => {
             try {
                 // Reset fullscreen flag periodically
                 if (document.fullscreenElement) {
                     window.fullscreenAttempted = true;
                 } else {
-                    // Reset flag every 15 seconds if not in fullscreen
+                    // Reset flag every 30 seconds if not in fullscreen
                     window.fullscreenAttempted = false;
                 }
                 
                 // Force cleanup of any stuck polling states
                 if (isPolling && !pollTimeoutId) {
-                    console.log('Detected stuck polling state, resetting...');
                     isPolling = false;
                 }
-                if (isVolumePolling && !volumePollInterval) {
-                    console.log('Detected stuck volume polling state, resetting...');
-                    isVolumePolling = false;
-                }
-                if (isMutePolling && !mutePollInterval) {
-                    console.log('Detected stuck mute polling state, resetting...');
-                    isMutePolling = false;
+                
+                // Health check (combined with cleanup to avoid redundant 30s intervals)
+                try {
+                    const response = await fetch('api.php?action=health');
+                    await response.json();
+                } catch (error) {
+                    console.error('💔 Health check failed:', error);
                 }
                 
-                // Run memory leak detection
-                detectMemoryLeaks();
-                
-                // Memory monitoring (only in development)
-                if (console.memory) {
-                    const mem = console.memory;
-                    if (mem.usedJSHeapSize > 50 * 1024 * 1024) { // 50MB threshold
-                        console.warn('High memory usage detected:', 
-                            Math.round(mem.usedJSHeapSize / 1024 / 1024) + 'MB used,',
-                            Math.round(mem.totalJSHeapSize / 1024 / 1024) + 'MB total');
-                        
-                        // Force garbage collection if available
-                        if (window.gc) {
-                            window.gc();
-                            console.log('Garbage collection triggered');
-                        }
-                    }
-                }
             } catch (error) {
-                console.error('Error in periodic cleanup:', error);
                 // Force cleanup on error
                 cleanup();
             }
-        }, 15000); // Run every 15 seconds instead of 30
+        }, 30000); // Run every 30 seconds to reduce overhead
         
-        // Additional memory leak prevention: clear intervals on page unload
-        window.addEventListener('beforeunload', () => {
-            // Force cleanup of all intervals and timeouts
-            if (volumePollInterval) {
-                clearInterval(volumePollInterval);
-                volumePollInterval = null;
-            }
-            if (mutePollInterval) {
-                clearInterval(mutePollInterval);
-                mutePollInterval = null;
-            }
-            if (pollInterval) {
-                clearInterval(pollInterval);
-            }
-            if (pollTimeoutId) {
-                clearTimeout(pollTimeoutId);
-                pollTimeoutId = null;
-            }
-            
-            // Reset all flags
-            isPolling = false;
-            isVolumePolling = false;
-            isMutePolling = false;
-            window.fullscreenAttempted = false;
-            
-            console.log('Page unload cleanup completed');
-        });
-
-        // Network request tracking
-        let activeRequests = 0;
-        let requestStartTimes = new Map();
-        
-        // Override fetch to track requests
-        const originalFetch = window.fetch;
-        window.fetch = function(...args) {
-            const requestId = Math.random().toString(36).substr(2, 9);
-            const startTime = Date.now();
-            
-            activeRequests++;
-            requestStartTimes.set(requestId, startTime);
-            
-            console.log(`🌐 Fetch request started: ${args[0]} (${activeRequests} active)`);
-            
-            return originalFetch.apply(this, args)
-                .then(response => {
-                    activeRequests--;
-                    requestStartTimes.delete(requestId);
-                    const duration = Date.now() - startTime;
-                    console.log(`✅ Fetch completed: ${args[0]} in ${duration}ms (${activeRequests} active)`);
-                    return response;
-                })
-                .catch(error => {
-                    activeRequests--;
-                    requestStartTimes.delete(requestId);
-                    const duration = Date.now() - startTime;
-                    console.error(`❌ Fetch failed: ${args[0]} after ${duration}ms (${activeRequests} active)`, error);
-                    throw error;
-                });
-        };
-        
-        // Check for hanging requests
-        setInterval(() => {
-            if (activeRequests > 0) {
-                const now = Date.now();
-                const hangingRequests = [];
-                
-                requestStartTimes.forEach((startTime, requestId) => {
-                    const duration = now - startTime;
-                    if (duration > 30000) { // 30 seconds
-                        hangingRequests.push({ requestId, duration });
-                    }
-                });
-                
-                if (hangingRequests.length > 0) {
-                    console.warn('🚨 Hanging requests detected:', hangingRequests);
-                    
-                    // If we have hanging requests for too long, force cleanup
-                    if (hangingRequests.some(req => req.duration > 60000)) { // 1 minute
-                        console.error('🚨 Critical: Requests hanging for over 1 minute, forcing cleanup');
-                        cleanup();
-                        
-                        // Reset all request tracking
-                        activeRequests = 0;
-                        requestStartTimes.clear();
-                    }
-                }
-            }
-        }, 10000); // Check every 10 seconds
-
-        // Health check monitoring
-        let lastHealthCheck = Date.now();
-        let healthCheckInterval = null;
-        
-        function startHealthMonitoring() {
-            if (healthCheckInterval) {
-                clearInterval(healthCheckInterval);
-            }
-            
-            healthCheckInterval = setInterval(async () => {
-                try {
-                    const startTime = Date.now();
-                    const response = await fetch('api.php?action=health');
-                    const health = await response.json();
-                    const duration = Date.now() - startTime;
-                    
-                    lastHealthCheck = Date.now();
-                    console.log(`💚 Health check OK: ${duration}ms`, health);
-                    
-                    // If health check takes too long, it might indicate server issues
-                    if (duration > 5000) { // 5 seconds
-                        console.warn('⚠️ Health check slow:', duration + 'ms');
-                    }
-                    
-                } catch (error) {
-                    console.error('💔 Health check failed:', error);
-                    
-                    // If health check fails multiple times, force recovery
-                    const timeSinceLastHealth = Date.now() - lastHealthCheck;
-                    if (timeSinceLastHealth > 30000) { // 30 seconds
-                        console.error('🚨 Health check failed for too long, forcing recovery');
-                        attemptRecovery();
-                    }
-                }
-            }, 20000); // Check every 20 seconds
-        }
-        
-        // Start health monitoring
-        startHealthMonitoring();
+        // Page unload cleanup handled by cleanup() function
     });
     </script>
 </body>

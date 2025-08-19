@@ -1,12 +1,63 @@
 {
-    "last_scan": 1755180922,
+    "last_scan": 1755613353,
     "available_directories": [
         ".git",
         "data",
+        "handlers",
         "videos"
     ],
-    "total_videos": 2,
+    "total_videos": 14,
     "all_video_files": [
+        {
+            "name": "Altai Mountains.mp4",
+            "dirIndex": 0,
+            "path": "videos\\Altai Mountains.mp4"
+        },
+        {
+            "name": "Blue Aquarium.mp4",
+            "dirIndex": 0,
+            "path": "videos\\Blue Aquarium.mp4"
+        },
+        {
+            "name": "Chobe Safari.mp4",
+            "dirIndex": 0,
+            "path": "videos\\Chobe Safari.mp4"
+        },
+        {
+            "name": "Forest River.mp4",
+            "dirIndex": 0,
+            "path": "videos\\Forest River.mp4"
+        },
+        {
+            "name": "Green Forest.mp4",
+            "dirIndex": 0,
+            "path": "videos\\Green Forest.mp4"
+        },
+        {
+            "name": "Hot Tub Ocean.mp4",
+            "dirIndex": 0,
+            "path": "videos\\Hot Tub Ocean.mp4"
+        },
+        {
+            "name": "Khwai River.mp4",
+            "dirIndex": 0,
+            "path": "videos\\Khwai River.mp4"
+        },
+        {
+            "name": "Misty Trail.mp4",
+            "dirIndex": 0,
+            "path": "videos\\Misty Trail.mp4"
+        },
+        {
+            "name": "Mountain River.mp4",
+            "dirIndex": 0,
+            "path": "videos\\Mountain River.mp4"
+        },
+        {
+            "name": "New Zealand Tour.mp4",
+            "dirIndex": 0,
+            "path": "videos\\New Zealand Tour.mp4"
+        },
         {
             "name": "Rocky Beach.mp4",
             "dirIndex": 0,
@@ -16,15 +67,25 @@
             "name": "Sunset Beach.mp4",
             "dirIndex": 0,
             "path": "videos\\Sunset Beach.mp4"
+        },
+        {
+            "name": "Swiss Alps.mp4",
+            "dirIndex": 0,
+            "path": "videos\\Swiss Alps.mp4"
+        },
+        {
+            "name": "Tropical Island.mp4",
+            "dirIndex": 0,
+            "path": "videos\\Tropical Island.mp4"
         }
     ],
     "pagination_info": {
-        "total": 2,
+        "total": 14,
         "pages": 1,
         "current": 1,
         "per_page": 20,
         "start": 1,
-        "end": 2
+        "end": 14
     },
     "available_backgrounds": [
         "assets/backgrounds/silver.jpg"

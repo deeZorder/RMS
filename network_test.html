@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>RMS Network Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #1a1a1a; color: white; }
+        .test { margin: 10px 0; padding: 10px; border: 1px solid #333; background: #2a2a2a; }
+        .success { background: #0a4a0a; border-color: #4a8a4a; }
+        .error { background: #4a0a0a; border-color: #8a4a4a; }
+        button { padding: 10px 20px; margin: 5px; background: #4ecdc4; border: none; color: black; cursor: pointer; }
+        .response { font-family: monospace; background: #000; padding: 10px; margin: 5px 0; border-radius: 3px; }
+    </style>
+</head>
+<body>
+    <h1>RMS Network & API Test</h1>
+    <p>This page tests if your device can access the RMS API after the refactor.</p>
+    
+    <div id="info" class="test">
+        <h3>Device Info</h3>
+        <div id="device-info"></div>
+    </div>
+    
+    <div id="network-test" class="test">
+        <h3>Network Tests</h3>
+        <button onclick="testHealth()">Test Health API</button>
+        <button onclick="testVideoTitles()">Test Video Titles</button>
+        <button onclick="testAllVideos()">Test Get All Videos</button>
+        <button onclick="testAllEndpoints()">Test All Critical Endpoints</button>
+        <div id="network-results"></div>
+    </div>
+    
+    <div id="comparison" class="test">
+        <h3>Before vs After Refactor</h3>
+        <p>The old API was a single 890-line file. The new API uses modular handlers.</p>
+        <p>If these tests fail, the issue is likely network connectivity, not the refactor.</p>
+    </div>
+
+    <script>
+        // Show device info
+        document.getElementById('device-info').innerHTML = `
+            <strong>User Agent:</strong> ${navigator.userAgent}<br>
+            <strong>Host:</strong> ${window.location.host}<br>
+            <strong>Current URL:</strong> ${window.location.href}<br>
+            <strong>Time:</strong> ${new Date().toISOString()}
+        `;
+
+        function addResult(test, success, response, error = null) {
+            const div = document.createElement('div');
+            div.className = success ? 'success' : 'error';
+            div.innerHTML = `
+                <h4>${test} ${success ? '✓' : '✗'}</h4>
+                ${error ? `<strong>Error:</strong> ${error}<br>` : ''}
+                <div class="response">${response}</div>
+                <small>Time: ${new Date().toLocaleTimeString()}</small>
+            `;
+            document.getElementById('network-results').appendChild(div);
+        }
+
+        async function testHealth() {
+            try {
+                const response = await fetch('api.php?action=health');
+                const text = await response.text();
+                
+                if (response.ok) {
+                    try {
+                        const json = JSON.parse(text);
+                        addResult('Health Check', true, `Status: ${response.status}, JSON: ${text}`);
+                    } catch (e) {
+                        addResult('Health Check', false, `Status: ${response.status}, Invalid JSON: ${text}`, e.message);
+                    }
+                } else {
+                    addResult('Health Check', false, `HTTP ${response.status}: ${text}`);
+                }
+            } catch (error) {
+                addResult('Health Check', false, 'Network request failed', error.message);
+            }
+        }
+
+        async function testVideoTitles() {
+            try {
+                const response = await fetch('api.php?action=get_video_titles');
+                const text = await response.text();
+                
+                if (response.ok) {
+                    try {
+                        const json = JSON.parse(text);
+                        addResult('Video Titles', true, `Status: ${response.status}, JSON: ${text}`);
+                    } catch (e) {
+                        addResult('Video Titles', false, `Status: ${response.status}, Invalid JSON: ${text}`, e.message);
+                    }
+                } else {
+                    addResult('Video Titles', false, `HTTP ${response.status}: ${text}`);
+                }
+            } catch (error) {
+                addResult('Video Titles', false, 'Network request failed', error.message);
+            }
+        }
+
+        async function testAllVideos() {
+            try {
+                const response = await fetch('api.php?action=get_all_videos&page=1&limit=5');
+                const text = await response.text();
+                
+                if (response.ok) {
+                    try {
+                        const json = JSON.parse(text);
+                        addResult('Get All Videos', true, `Status: ${response.status}, Videos found: ${json.videos ? json.videos.length : 'unknown'}`);
+                    } catch (e) {
+                        addResult('Get All Videos', false, `Status: ${response.status}, Invalid JSON: ${text}`, e.message);
+                    }
+                } else {
+                    addResult('Get All Videos', false, `HTTP ${response.status}: ${text}`);
+                }
+            } catch (error) {
+                addResult('Get All Videos', false, 'Network request failed', error.message);
+            }
+        }
+
+        async function testAllEndpoints() {
+            const endpoints = [
+                'health',
+                'get_all_videos?page=1&limit=5',
+                'get_current_video',
+                'get_playback_state',
+                'get_video_count',
+                'get_video_titles'
+            ];
+
+            for (const endpoint of endpoints) {
+                try {
+                    const response = await fetch(`api.php?action=${endpoint}`);
+                    const text = await response.text();
+                    
+                    if (response.ok && text.trim().startsWith('{')) {
+                        addResult(endpoint, true, `✓ Working`);
+                    } else {
+                        addResult(endpoint, false, `Status: ${response.status}, Response: ${text.substring(0, 100)}`);
+                    }
+                } catch (error) {
+                    addResult(endpoint, false, 'Network failed', error.message);
+                }
+                
+                // Small delay between requests
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+        }
+
+        // Auto-run health check on page load
+        window.addEventListener('load', () => {
+            setTimeout(testHealth, 500);
+        });
+    </script>
+</body>
+</html>

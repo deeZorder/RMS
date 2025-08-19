@@ -25,6 +25,8 @@ A professional multi-page PHP/HTML/JS/CSS multimedia system designed for comfort
 - **System-wide directory browsing** - select folders from any location/drive
 - **Pagination system** handles massive video collections (30,000+ videos)
 - **Custom video title management** with thumbnail previews
+- **Visual carousel preview** with balanced video distribution across rows
+- **Interactive video management** - edit titles and reorder videos in dashboard layout
 - **Responsive design** optimized for mobile, tablet, and desktop
 - **Toggle controls** for video thumbnails and information density
 - **Automatic dashboard refresh on save** for multi-device setups
@@ -57,6 +59,8 @@ A professional multi-page PHP/HTML/JS/CSS multimedia system designed for comfort
 - **Multi-Device Sync**: Dashboard auto-refreshes when you save changes in Admin
 - **Live State Updates**: Real-time playback state synchronization
 - **Persistent Settings**: All configurations saved and restored automatically
+- **Balanced Distribution**: Videos automatically spread evenly across dashboard rows
+- **Visual Layout Matching**: Admin carousel preview accurately reflects dashboard layout
 
 ## 🚀 Quick Start
 
@@ -153,6 +157,24 @@ RMS/
 - **Static assets** (CSS/JS/JSON) are served with UTF‑8 via `.htaccess`
 - **CSS** declares `@charset "UTF-8"` as the first line
 
+## ⚠️ System Requirements & Compatibility
+
+### PHP Version Requirements
+- **Minimum**: PHP 7.3 (tested and compatible)
+- **Recommended**: PHP 7.4+ for optimal performance
+- **Important**: The API was refactored in v2.3 to use modern handler architecture while maintaining PHP 7.3 compatibility
+
+### Critical Compatibility Notes
+- **PHP 7.3 Servers**: If you experience "syntax error, unexpected 'string'" in APIRouter.php, ensure typed properties have been removed (fixed in v2.3+)
+- **API Endpoint Issues**: "Failed to load directories" or empty API responses typically indicate PHP version compatibility problems
+- **Handler Architecture**: The new modular API system is fully backward compatible with PHP 7.3
+
+### Server Configuration
+- **Web Server**: Apache 2.4+ or Nginx 1.18+
+- **PHP Extensions**: Standard (no additional extensions required)
+- **File Permissions**: PHP must have read access to video directories
+- **Optional**: FFmpeg for thumbnail generation (not required for basic functionality)
+
 ## 🆘 Troubleshooting
 
 ### Performance Issues
@@ -167,11 +189,34 @@ RMS/
  - **Thumbnails Not Generating**: Ensure `ffmpeg` is installed and available in PATH. Use Admin → System Actions → "Clear Thumbnails & Titles", then re-add or rescan directories to warm thumbnails.
 
 ### Directory Issues
+- **"Failed to load directories"**: Check PHP version compatibility (see System Requirements above)
 - **Can't Browse**: Ensure PHP has read permissions for target directories
 - **Path Errors**: Use the directory browser instead of manual path entry
 - **Network Drives**: Map drives before selection or use UNC paths
 
+### API & Handler Issues
+- **Empty API responses**: Likely PHP syntax error due to version incompatibility
+- **500 Internal Server Error**: Enable `display_errors = 1` in api.php temporarily to see actual error
+- **Missing endpoints**: Ensure all 5 legacy endpoints are present in APIRouter (fixed in v2.3+)
+- **Handler not found**: Verify all handler files exist and are properly included
+
 ## 🔄 Recent Updates
+
+### v2.4 - Enhanced Admin Panel & Balanced Distribution
+- **Visual carousel preview**: Admin panel now shows accurate dashboard layout preview
+- **Balanced video distribution**: Videos spread evenly across all dashboard rows instead of sequential filling
+- **Interactive video management**: Edit titles and reorder videos directly in carousel preview
+- **Improved error handling**: Enhanced API error detection and graceful fallbacks
+- **Admin panel refinements**: Removed list view, simplified interface focused on carousel
+- **Real-time layout sync**: Admin preview matches dashboard layout exactly
+
+### v2.3 - API Refactor & PHP 7.3 Compatibility
+- **Modular handler architecture**: Split monolithic API into specialized handlers
+- **PHP 7.3 compatibility**: Removed typed properties for broader server support
+- **Missing endpoints restored**: Re-added 5 critical legacy endpoints (`check_mute_signal`, `check_volume_signal`, `check_refresh_signal`, `trigger_dashboard_refresh`, `force_refresh_videos`)
+- **Directory browser fixes**: Resolved "Failed to load directories" issues
+- **Real-time synchronization**: Restored signal-based communication between devices
+- **Distributed setup support**: Fixed multi-device coordination (tablet, monitor, server)
 
 ### v2.2 - System Actions & Screen Controls
 - Default screen controls hidden; enable per screen with `?controls=1`
@@ -204,6 +249,6 @@ RMS/
 
 ---
 
-**System Requirements**: PHP 7.4+, Apache/Nginx, Modern web browser  
+**System Requirements**: PHP 7.3+, Apache/Nginx, Modern web browser  
 **Tested Collections**: Up to 30,000 videos  
 **Performance**: Sub-2 second load times on standard hardware

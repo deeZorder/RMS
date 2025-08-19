@@ -425,6 +425,176 @@ body.dashboard-bg .video-controls {
     }
 }
 
+/* Admin Carousel Preview Styles */
+.admin-carousel-preview {
+    background-color: #1a1a1a;
+    border: 1px solid #333;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.admin-carousel-preview h4 {
+    color: #4ecdc4;
+    margin-bottom: 15px;
+    text-align: center;
+}
+
+.admin-carousel-row {
+    position: relative;
+    margin-bottom: 20px;
+    background-color: #2a2a2a;
+    border: 1px solid #444;
+    border-radius: 6px;
+    padding: 15px;
+}
+
+.admin-carousel-row-header {
+    color: #4ecdc4;
+    font-size: 0.9em;
+    margin-bottom: 10px;
+    font-weight: 600;
+}
+
+.admin-carousel-track {
+    display: flex;
+    gap: 12px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 5px 0;
+}
+
+.admin-carousel-track::-webkit-scrollbar {
+    height: 6px;
+}
+
+.admin-carousel-track::-webkit-scrollbar-track {
+    background: #333;
+    border-radius: 3px;
+}
+
+.admin-carousel-track::-webkit-scrollbar-thumb {
+    background: #666;
+    border-radius: 3px;
+}
+
+.admin-carousel-track::-webkit-scrollbar-thumb:hover {
+    background: #888;
+}
+
+.admin-carousel-item {
+    background-color: #666565;
+    border-radius: 6px;
+    position: relative;
+    height: 120px;
+    min-width: 160px;
+    max-width: 160px;
+    flex: 0 0 160px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    overflow: hidden;
+}
+
+.admin-carousel-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.admin-carousel-item.playing {
+    border: 2px solid #4ecdc4;
+    box-shadow: 0 0 12px rgba(78, 205, 196, 0.3);
+}
+
+.admin-carousel-item img {
+    width: 100%;
+    height: 80px;
+    object-fit: cover;
+    border-radius: 4px 4px 0 0;
+}
+
+.admin-carousel-item .admin-title {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: rgba(0, 0, 0, 0.8);
+    color: #fff;
+    padding: 4px 8px;
+    font-size: 0.8em;
+    text-align: center;
+    border-radius: 0 0 6px 6px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.admin-carousel-item .admin-controls {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    display: flex;
+    gap: 8px;
+}
+
+.admin-carousel-item:hover .admin-controls {
+    opacity: 1;
+}
+
+.admin-carousel-item .admin-controls button {
+    background: rgba(0, 0, 0, 0.7);
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-size: 0.7em;
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.admin-carousel-item .admin-controls button:hover {
+    background: rgba(0, 0, 0, 0.9);
+}
+
+.admin-carousel-item .reorder-controls {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.admin-carousel-item:hover .reorder-controls {
+    opacity: 1;
+}
+
+.admin-carousel-item .reorder-controls button {
+    background: rgba(78, 205, 196, 0.9);
+    color: #fff;
+    border: none;
+    border-radius: 3px;
+    padding: 2px 6px;
+    font-size: 0.7em;
+    cursor: pointer;
+    line-height: 1;
+}
+
+.admin-carousel-item .reorder-controls button:hover {
+    background: rgba(78, 205, 196, 1);
+}
+
+.admin-carousel-empty {
+    color: #666;
+    text-align: center;
+    padding: 40px;
+    font-style: italic;
+}
+
 /* Admin Panel Styles */
 .admin-page {
     min-height: 100vh;
@@ -1075,4 +1245,59 @@ body.dashboard-bg .video-controls {
 @keyframes pulse-warning {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.7; }
+}
+
+/* Screen-specific styles moved from inline PHP */
+/* Aggressively hide native controls across browsers when controls are disabled */
+video.video-no-controls::-webkit-media-controls { 
+    display: none !important; 
+}
+
+video.video-no-controls::-webkit-media-controls-enclosure { 
+    display: none !important; 
+}
+
+video.video-no-controls::-moz-media-controls { 
+    display: none !important; 
+}
+
+/* Black screen styling - ensure it works */
+body.screen-off {
+    background-color: #000000 !important;
+    background: #000000 !important;
+    color: #000000 !important;
+}
+
+html.screen-off {
+    background-color: #000000 !important;
+    background: #000000 !important;
+}
+
+.screen-off * {
+    background-color: #000000 !important;
+    background: #000000 !important;
+    color: #000000 !important;
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+}
+
+/* Specifically target the placeholder when screen is off */
+body.screen-off #placeholder,
+body.screen-off .placeholder {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    position: absolute !important;
+    left: -9999px !important;
+    top: -9999px !important;
+    z-index: -9999 !important;
+    pointer-events: none !important;
+    background: transparent !important;
+    border: none !important;
+    color: transparent !important;
+    width: 0 !important;
+    height: 0 !important;
+    overflow: hidden !important;
+    clip: rect(0, 0, 0, 0) !important;
 }

@@ -1,6 +1,39 @@
 <?php
 // admin.php
-// Administrative page used to configure the media system.
+// Administrative interface for the Relax Media system.
+
+// Include shared state management
+require_once __DIR__ . '/state_manager.php';
+
+// Ensure triggerDashboardRefresh function is available
+if (!function_exists('triggerDashboardRefresh')) {
+    /**
+     * Fallback triggerDashboardRefresh function if not loaded from state_manager.php
+     * @param string $profileId The dashboard profile ID to refresh
+     * @return bool Success status
+     */
+    function triggerDashboardRefresh($profileId) {
+        // Modern approach: Update state with a refresh timestamp
+        // Dashboards can poll for this change to trigger refreshes
+        if (function_exists('updateState')) {
+            $updates = [
+                'lastRefreshTrigger' => time(),
+                'refreshRequested' => true
+            ];
+            return updateState($profileId, $updates);
+        }
+        
+        // Fallback: Write directly to a refresh signal file if updateState is not available
+        $baseDir = __DIR__;
+        $dataDir = $baseDir . '/data';
+        $profilesDir = $dataDir . '/profiles';
+        if (!is_dir($profilesDir)) { @mkdir($profilesDir, 0777, true); }
+        $profileDir = $profilesDir . '/' . $profileId;
+        if (!is_dir($profileDir)) { @mkdir($profileDir, 0777, true); }
+        $refreshFile = $profileDir . '/dashboard_refresh.txt';
+        return file_put_contents($refreshFile, time()) !== false;
+    }
+}
 
 // Security headers (must be sent before any output)
 header('X-Content-Type-Options: nosniff');
@@ -188,14 +221,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             @unlink($adminCachePath);
         }
         
-        // Trigger refresh for the selected dashboard profile (per-profile refresh file)
+        // Trigger refresh for the selected dashboard profile
         $sanitizedId = preg_replace('/[^a-zA-Z0-9_\-]/', '', $dashboardId);
-        $profileDir = __DIR__ . '/data/profiles/' . ($sanitizedId !== '' ? $sanitizedId : 'default');
-        if (!is_dir($profileDir)) { @mkdir($profileDir, 0777, true); }
-        @file_put_contents($profileDir . '/dashboard_refresh.txt', time());
-        // Also write legacy/global locations for older dashboards still polling globally
-        @file_put_contents(__DIR__ . '/data/dashboard_refresh.txt', time());
-        @file_put_contents(__DIR__ . '/dashboard_refresh.txt', time());
+        $profileId = ($sanitizedId !== '' ? $sanitizedId : 'default');
+        triggerDashboardRefresh($profileId);
         // Redirect without query param
         header('Location: admin.php?admin-panel=' . urlencode($currentSection) . '&dashboard=' . urlencode($dashboardId));
         exit;
@@ -215,7 +244,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
         // Trigger refresh and redirect back
-        @file_put_contents(__DIR__ . '/data/dashboard_refresh.txt', time());
+        triggerDashboardRefresh('default');
         header('Location: admin.php?admin-panel=dashboard-settings&dashboard=default');
         exit;
     }
@@ -255,7 +284,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (file_exists($adminCachePath)) { @unlink($adminCachePath); }
 
         // Touch refresh so dashboards/screens update
-        @file_put_contents($baseDir . '/data/dashboard_refresh.txt', time());
+        triggerDashboardRefresh('default');
 
         $_SESSION['flash'] = ['type' => 'success', 'message' => 'Cleared thumbnails, previews and titles'];
         header('Location: admin.php?admin-panel=system-status');
@@ -264,15 +293,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // System action: trigger dashboard refresh signal
     if ($currentSection === 'system-refresh') {
-        // Touch per-profile default and legacy/global refresh files
-        $defaultProfileDir = __DIR__ . '/data/profiles/default';
-        if (!is_dir($defaultProfileDir)) { @mkdir($defaultProfileDir, 0777, true); }
-        @file_put_contents($defaultProfileDir . '/dashboard_refresh.txt', time());
-        @file_put_contents(__DIR__ . '/data/dashboard_refresh.txt', time());
-        @file_put_contents(__DIR__ . '/dashboard_refresh.txt', time());
+        // Trigger refresh for all dashboard profiles
+        $refreshCount = 0;
+        
+        // Always refresh default profile
+        if (triggerDashboardRefresh('default')) {
+            $refreshCount++;
+        }
+        
+        // Refresh all other dashboard profiles
+        if (!empty($dashboards) && is_array($dashboards)) {
+            foreach (array_keys($dashboards) as $profileId) {
+                if ($profileId !== 'default') {
+                    if (triggerDashboardRefresh($profileId)) {
+                        $refreshCount++;
+                    }
+                }
+            }
+        }
 
-        // Optional flash message
-        $_SESSION['flash'] = ['type' => 'success', 'message' => 'Dashboard refresh signal sent'];
+        // Clear admin cache to force fresh data on next load
+        if (file_exists($adminCachePath)) {
+            @unlink($adminCachePath);
+        }
+
+        // Optional flash message with count
+        $_SESSION['flash'] = ['type' => 'success', 'message' => "Dashboard refresh signal sent to {$refreshCount} dashboard profile(s)"];
 
         // Redirect back to System Status
         header('Location: admin.php?admin-panel=system-status');
@@ -614,7 +660,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         file_put_contents($screensPath, json_encode($screensReset, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
 
         // Touch refresh signal
-        @file_put_contents(__DIR__ . '/data/dashboard_refresh.txt', time());
+        triggerDashboardRefresh('default');
 
         // Redirect back to System Status
         header('Location: admin.php?admin-panel=system-status');
@@ -643,7 +689,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ];
                 file_put_contents($dashboardsPath, json_encode($dashboards, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
             }
-            @file_put_contents(__DIR__ . '/data/dashboard_refresh.txt', time());
+            triggerDashboardRefresh('default');
             header('Location: admin.php?admin-panel=screen-management#screen-management');
             exit;
         } elseif ($smAction === 'add-screen') {
@@ -697,7 +743,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     @rmdir($profileDir);
                 }
             }
-            @file_put_contents(__DIR__ . '/data/dashboard_refresh.txt', time());
+            triggerDashboardRefresh('default');
             header('Location: admin.php?admin-panel=screen-management#screen-management');
             exit;
         }
@@ -762,8 +808,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             @unlink($adminCachePath);
         }
         
-        @file_put_contents(__DIR__ . '/data/dashboard_refresh.txt', time());
-        @file_put_contents(__DIR__ . '/dashboard_refresh.txt', time());
+        triggerDashboardRefresh('default');
         // Redirect without query param
         header('Location: admin.php?admin-panel=' . urlencode($currentSection));
         exit;
@@ -1433,7 +1478,7 @@ if ($needsAdminScan || !isset($adminCache['available_backgrounds'])) {
                             <?php endif; ?>
                             
                             <div id="video-titles-container">
-                                <!-- Video titles will be loaded here -->
+                                <!-- Video carousel preview will be loaded here -->
                             </div>
                         </div>
                     </section>
@@ -2053,7 +2098,7 @@ if ($needsAdminScan || !isset($adminCache['available_backgrounds'])) {
         // Define loadVideoTitles function before using it
         function loadVideoTitles() {
             const container = document.getElementById('video-titles-container');
-            console.log('Loading video titles, container:', container);
+            console.log('Loading video carousel preview, container:', container);
             
             if (!container) {
                 console.error('Video titles container not found!');
@@ -2070,8 +2115,38 @@ if ($needsAdminScan || !isset($adminCache['available_backgrounds'])) {
             // Get paginated videos and their titles
             console.log('Fetching videos for page:', currentPage);
             Promise.all([
-                fetch(`api.php?action=get_all_videos&page=${currentPage}&limit=20`).then(res => res.json()),
-                fetch('api.php?action=get_video_titles').then(res => res.json())
+                fetch(`api.php?action=get_all_videos&page=${currentPage}&limit=20`)
+                    .then(res => {
+                        if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+                        return res.text();
+                    })
+                    .then(text => {
+                        if (!text.trim()) throw new Error('Empty response from get_all_videos');
+                        try {
+                            return JSON.parse(text);
+                        } catch (e) {
+                            console.error('Invalid JSON from get_all_videos:', text);
+                            throw new Error('Invalid JSON response from get_all_videos');
+                        }
+                    }),
+                fetch('api.php?action=get_video_titles')
+                    .then(res => {
+                        if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+                        return res.text();
+                    })
+                    .then(text => {
+                        if (!text.trim()) {
+                            console.warn('Empty response from get_video_titles, using fallback');
+                            return { titles: {} };
+                        }
+                        try {
+                            return JSON.parse(text);
+                        } catch (e) {
+                            console.error('Invalid JSON from get_video_titles:', text);
+                            console.warn('Using fallback titles data');
+                            return { titles: {} };
+                        }
+                    })
             ]).then(([videosData, titlesData]) => {
                 console.log('Videos data:', videosData);
                 console.log('Titles data:', titlesData);
@@ -2083,127 +2158,221 @@ if ($needsAdminScan || !isset($adminCache['available_backgrounds'])) {
                     return;
                 }
                 
-                let html = '<div class="video-titles-list">';
-                videos.forEach(video => {
-                    // Handle both string and object formats for backward compatibility
-                    const videoName = typeof video === 'string' ? video : video.name;
-                    const videoDirIndex = typeof video === 'string' ? 0 : video.dirIndex;
-                    const titleKey = videoDirIndex + '|' + videoName;
-                    const currentTitle = titles[titleKey] || videoName.replace(/\.[^/.]+$/, '');
-                    const directory = <?php echo json_encode($config['directory']); ?>;
-                    const separator = directory.includes(':\\') ? '\\' : '/';
-                    const videoPath = directory + separator + videoName;
-                    const safeVideoPath = videoPath.split('\\').join('\\\\');
-                    const videoId = videoName.replace(/[^a-zA-Z0-9]/g, '_');
-                    html += '<div class="video-title-item">';
-                    // Reorder controls
-                    html += '<div class="video-reorder" style="display:flex; flex-direction:column; gap:6px; margin-right:10px; align-items:center;">';
-                    html += '<button type="button" class="btn secondary move-btn" data-filename="' + escapeAttr(videoName) + '" data-dir-index="' + videoDirIndex + '" data-direction="up" title="Move up">▲</button>';
-                    html += '<button type="button" class="btn secondary move-btn" data-filename="' + escapeAttr(videoName) + '" data-dir-index="' + videoDirIndex + '" data-direction="down" title="Move down">▼</button>';
-                    html += '</div>';
-                    html += '<div class="video-thumbnail">';
-                    html += '<img src="thumb.php?file=' + encodeURIComponent(videoName) + '&dirIndex=' + videoDirIndex + '" alt="thumbnail" loading="lazy" />';
-                    html += '</div>';
-                    html += '<div class="video-info">';
-                    html += '<label for="title-' + videoId + '">' + escapeHtml(videoName) + '</label>';
-                    html += '<input type="text" id="title-' + videoId + '" value="' + escapeAttr(currentTitle) + '" placeholder="Enter custom title" maxlength="26">';
-                    html += '<button type="button" class="btn secondary save-title-btn" data-filename="' + escapeAttr(videoName) + '" data-dir-index="' + videoDirIndex + '">Save</button>';
-                    html += '</div>';
-                    html += '</div>';
-                });
-                html += '</div>';
-                container.innerHTML = html;
-                
-                // Always show all video items
-                document.querySelectorAll('.video-title-item').forEach(item => {
-                    item.style.display = 'flex';
-                });
+                // Always render carousel view
+                renderCarouselView(videos, titles, container);
+            }).catch(err => {
+                console.error('Failed to load video titles:', err);
+                container.innerHTML = '<div style="text-align: center; padding: 20px; color: #ff6b6b;">❌ Error loading videos: ' + err.message + '</div>';
+            });
+        }
 
-                // Images load natively; optionally handle error state
-                const thumbImgs = container.querySelectorAll('.video-thumbnail img');
-                thumbImgs.forEach(img => {
-                    img.addEventListener('error', () => { img.alt = 'thumbnail unavailable'; });
-                });
+        
+        function renderCarouselView(videos, titles, container) {
+            // Get dashboard configuration for rows and clipsPerRow
+            const dashboardSettings = getCurrentDashboardSettings();
+            const rows = dashboardSettings.rows || 2;
+            const clipsPerRow = dashboardSettings.clipsPerRow || 4;
+            
+            // Distribute videos across rows with balanced algorithm
+            const rowsData = [];
+            const totalVideos = videos.length;
+            
+            if (totalVideos === 0) {
+                // No videos to distribute
+            } else if (rows === 1) {
+                // Single row gets all videos
+                rowsData.push([...videos]);
+            } else {
+                // Multi-row balanced distribution
+                const videosPerRowBase = Math.floor(totalVideos / rows);
+                const extraVideos = totalVideos % rows;
                 
-                // Add event listeners for save buttons
-                document.querySelectorAll('.save-title-btn').forEach(btn => {
-                    btn.addEventListener('click', function() {
-                        const filename = this.getAttribute('data-filename');
-                        const dirIndex = this.getAttribute('data-dir-index') || '0';
-                        const titleId = filename.replace(/[^a-zA-Z0-9]/g, '_');
-                        const input = document.getElementById('title-' + titleId);
-                        const title = input.value.trim();
+                let videoIndex = 0;
+                for (let rowIndex = 0; rowIndex < rows; rowIndex++) {
+                    // Some rows get one extra video to distribute the remainder
+                    const videosForThisRow = videosPerRowBase + (rowIndex < extraVideos ? 1 : 0);
+                    const rowVideos = videos.slice(videoIndex, videoIndex + videosForThisRow);
+                    rowsData.push(rowVideos);
+                    videoIndex += videosForThisRow;
+                    
+                    // Stop if we've distributed all videos
+                    if (videoIndex >= totalVideos) break;
+                }
+            }
+            
+            let html = '<div class="admin-carousel-preview">';
+            html += '<h4>Dashboard Preview Layout (' + rows + ' rows, balanced distribution)</h4>';
+            
+            if (rowsData.length === 0) {
+                html += '<div class="admin-carousel-empty">No videos available</div>';
+            } else {
+                rowsData.forEach((rowVideos, rowIndex) => {
+                    html += '<div class="admin-carousel-row">';
+                    html += '<div class="admin-carousel-row-header">Row ' + (rowIndex + 1) + ' (' + rowVideos.length + ' videos)</div>';
+                    html += '<div class="admin-carousel-track">';
+                    
+                    rowVideos.forEach((video, videoIndex) => {
+                        const videoName = typeof video === 'string' ? video : video.name;
+                        const videoDirIndex = typeof video === 'string' ? 0 : video.dirIndex;
+                        const titleKey = videoDirIndex + '|' + videoName;
+                        const currentTitle = titles[titleKey] || videoName.replace(/\.[^/.]+$/, '');
+                        const videoId = videoName.replace(/[^a-zA-Z0-9]/g, '_');
+                        const position = rowIndex * clipsPerRow + videoIndex + 1;
                         
-                        if (title) {
-                            const formData = new FormData();
-                            formData.append('filename', filename);
-                            formData.append('title', title);
-                            formData.append('dirIndex', dirIndex);
-                            
-                            fetch('api.php?action=set_video_title', {
-                                method: 'POST',
-                                body: formData
-                            }).then(res => res.json()).then(data => {
-                                if (data.status === 'ok') {
-                                    console.log('Title saved for', filename);
-                                    // Show success feedback
-                                    this.textContent = 'Saved!';
-                                    this.className = 'btn primary save-title-btn';
-                                    
-                                    // Automatically refresh the dashboard
-                                    console.log('Triggering dashboard refresh after title save');
-                                    fetch('api.php?action=trigger_dashboard_refresh', { method: 'POST' })
-                                        .then(res => res.json())
-                                        .then(refreshData => {
-                                            console.log('Dashboard refresh triggered:', refreshData);
-                                        })
-                                        .catch(err => console.error('Failed to trigger dashboard refresh:', err));
-                                    
-                                    setTimeout(() => {
-                                        this.textContent = 'Save';
-                                        this.className = 'btn secondary save-title-btn';
-                                    }, 2000);
-                                }
-                            }).catch(err => console.error('Failed to save title:', err));
-                        }
+                        html += '<div class="admin-carousel-item" data-filename="' + escapeAttr(videoName) + '" data-dir-index="' + videoDirIndex + '" data-position="' + position + '">';
+                        html += '<img src="thumb.php?file=' + encodeURIComponent(videoName) + '&dirIndex=' + videoDirIndex + '" alt="thumbnail" loading="lazy" />';
+                        html += '<div class="admin-title" title="' + escapeAttr(currentTitle) + '">' + escapeHtml(currentTitle) + '</div>';
+                        html += '<div class="reorder-controls">';
+                        html += '<button type="button" class="move-btn" data-filename="' + escapeAttr(videoName) + '" data-dir-index="' + videoDirIndex + '" data-direction="up" title="Move up">▲</button>';
+                        html += '<button type="button" class="move-btn" data-filename="' + escapeAttr(videoName) + '" data-dir-index="' + videoDirIndex + '" data-direction="down" title="Move down">▼</button>';
+                        html += '</div>';
+                        html += '<div class="admin-controls">';
+                        html += '<button type="button" class="edit-title-btn" data-filename="' + escapeAttr(videoName) + '" data-dir-index="' + videoDirIndex + '" data-video-id="' + videoId + '">Edit</button>';
+                        html += '</div>';
+                        html += '</div>';
                     });
+                    
+                    html += '</div></div>';
                 });
-
-                // Add event listeners for move buttons
-                document.querySelectorAll('.move-btn').forEach(btn => {
-                    btn.addEventListener('click', function() {
-                        const filename = this.getAttribute('data-filename');
-                        const dirIndex = this.getAttribute('data-dir-index') || '0';
-                        const direction = this.getAttribute('data-direction');
-
-                        const formData = new FormData();
-                        formData.append('filename', filename);
-                        formData.append('dirIndex', dirIndex);
-                        formData.append('direction', direction);
-
-                        // Visual feedback
-                        this.textContent = direction === 'up' ? '⏫' : '⏬';
-                        this.disabled = true;
-
-                        fetch('api.php?action=move_video', { method: 'POST', body: formData })
-                            .then(async res => { const t = await res.text(); try { return JSON.parse(t); } catch(e){ console.error('Move video raw:', t); throw e; } })
-                            .then(data => {
-                                if (data.status === 'ok') {
-                                    // Reload current page list
-                                    loadVideoTitles();
-                                    // Trigger dashboard refresh so order updates there too
-                                    fetch('api.php?action=trigger_dashboard_refresh', { method: 'POST' }).catch(() => {});
-                                } else {
-                                    console.error('Move failed:', data);
-                                }
-                            })
-                            .catch(err => console.error('Failed to move video:', err))
-                            .finally(() => {
-                                setTimeout(() => { this.disabled = false; this.textContent = direction === 'up' ? '▲' : '▼'; }, 500);
-                            });
-                    });
+            }
+            
+            html += '</div>';
+            container.innerHTML = html;
+            
+            setupCarouselEventListeners();
+        }
+        
+        function getCurrentDashboardSettings() {
+            // Try to get dashboard settings from the selected dashboard
+            const selectedDashboard = '<?php echo $selectedDashboard ?? "default"; ?>';
+            const dashboards = <?php echo json_encode($dashboards); ?>;
+            
+            if (dashboards[selectedDashboard]) {
+                return dashboards[selectedDashboard];
+            }
+            
+            // Fallback to config
+            return {
+                rows: <?php echo (int)($config['rows'] ?? 2); ?>,
+                clipsPerRow: <?php echo (int)($config['clipsPerRow'] ?? 4); ?>
+            };
+        }
+        
+        function setupCarouselEventListeners() {
+            // Images load natively; optionally handle error state
+            const thumbImgs = document.querySelectorAll('.admin-carousel-item img');
+            thumbImgs.forEach(img => {
+                img.addEventListener('error', () => { img.alt = 'thumbnail unavailable'; });
+            });
+            
+            // Add event listeners for edit title buttons
+            document.querySelectorAll('.edit-title-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const filename = this.getAttribute('data-filename');
+                    const dirIndex = this.getAttribute('data-dir-index') || '0';
+                    const videoId = this.getAttribute('data-video-id');
+                    
+                    // Get current title
+                    const titleElement = this.closest('.admin-carousel-item').querySelector('.admin-title');
+                    const currentTitle = titleElement.textContent;
+                    
+                    // Prompt for new title
+                    const newTitle = prompt('Enter new title for: ' + filename, currentTitle);
+                    if (newTitle !== null && newTitle.trim() !== '') {
+                        saveVideoTitle(filename, dirIndex, newTitle.trim(), this, () => {
+                            // Update the title display immediately
+                            titleElement.textContent = newTitle.trim();
+                            titleElement.title = newTitle.trim();
+                        });
+                    }
                 });
-            }).catch(err => console.error('Failed to load video titles:', err));
+            });
+
+            // Add event listeners for move buttons
+            document.querySelectorAll('.move-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const filename = this.getAttribute('data-filename');
+                    const dirIndex = this.getAttribute('data-dir-index') || '0';
+                    const direction = this.getAttribute('data-direction');
+                    
+                    moveVideo(filename, dirIndex, direction, this);
+                });
+            });
+        }
+        
+        function saveVideoTitle(filename, dirIndex, title, buttonElement, successCallback) {
+            const formData = new FormData();
+            formData.append('filename', filename);
+            formData.append('title', title);
+            formData.append('dirIndex', dirIndex);
+            
+            const originalText = buttonElement.textContent;
+            buttonElement.textContent = 'Saving...';
+            buttonElement.disabled = true;
+            
+            fetch('api.php?action=set_video_title', {
+                method: 'POST',
+                body: formData
+            }).then(res => res.json()).then(data => {
+                if (data.status === 'ok') {
+                    console.log('Title saved for', filename);
+                    buttonElement.textContent = 'Saved!';
+                    buttonElement.className = buttonElement.className.replace('secondary', 'primary');
+                    
+                    if (successCallback) {
+                        successCallback();
+                    }
+                    
+                    setTimeout(() => {
+                        buttonElement.textContent = originalText;
+                        buttonElement.className = buttonElement.className.replace('primary', 'secondary');
+                        buttonElement.disabled = false;
+                    }, 2000);
+                } else {
+                    buttonElement.textContent = 'Error';
+                    setTimeout(() => {
+                        buttonElement.textContent = originalText;
+                        buttonElement.disabled = false;
+                    }, 2000);
+                }
+            }).catch(err => {
+                console.error('Failed to save title:', err);
+                buttonElement.textContent = 'Error';
+                setTimeout(() => {
+                    buttonElement.textContent = originalText;
+                    buttonElement.disabled = false;
+                }, 2000);
+            });
+        }
+        
+        function moveVideo(filename, dirIndex, direction, buttonElement) {
+            const formData = new FormData();
+            formData.append('filename', filename);
+            formData.append('dirIndex', dirIndex);
+            formData.append('direction', direction);
+
+            // Visual feedback
+            const originalText = buttonElement.textContent;
+            buttonElement.textContent = direction === 'up' ? '⏫' : '⏬';
+            buttonElement.disabled = true;
+
+            fetch('api.php?action=move_video', { method: 'POST', body: formData })
+                .then(async res => { const t = await res.text(); try { return JSON.parse(t); } catch(e){ console.error('Move video raw:', t); throw e; } })
+                .then(data => {
+                    if (data.status === 'ok') {
+                        // Reload current page list
+                        loadVideoTitles();
+                    } else {
+                        console.error('Move failed:', data);
+                    }
+                })
+                .catch(err => console.error('Failed to move video:', err))
+                .finally(() => {
+                    setTimeout(() => { 
+                        buttonElement.disabled = false; 
+                        buttonElement.textContent = originalText;
+                    }, 500);
+                });
         }
         
         // Load and display video titles
