@@ -1,17 +1,23 @@
 {
-    "last_scan": 1755613353,
+    "last_scan": 1756367377,
     "available_directories": [
         ".git",
+        "admin",
         "data",
         "handlers",
         "videos"
     ],
-    "total_videos": 14,
+    "total_videos": 15,
     "all_video_files": [
         {
             "name": "Altai Mountains.mp4",
             "dirIndex": 0,
             "path": "videos\\Altai Mountains.mp4"
+        },
+        {
+            "name": "Amazon.mp4",
+            "dirIndex": 0,
+            "path": "videos\\Amazon.mp4"
         },
         {
             "name": "Blue Aquarium.mp4",
@@ -79,14 +85,6 @@
             "path": "videos\\Tropical Island.mp4"
         }
     ],
-    "pagination_info": {
-        "total": 14,
-        "pages": 1,
-        "current": 1,
-        "per_page": 20,
-        "start": 1,
-        "end": 14
-    },
     "available_backgrounds": [
         "assets/backgrounds/silver.jpg"
     ]

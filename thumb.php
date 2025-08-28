@@ -26,6 +26,7 @@ if (!empty($config['directories']) && is_array($config['directories'])) {
 
 $file = $_GET['file'] ?? '';
 $dirIndex = isset($_GET['dirIndex']) ? (int)$_GET['dirIndex'] : 0;
+$noGen = isset($_GET['noGen']) ? (int)$_GET['noGen'] : 0;
 
 // Basic validation
 if ($file === '' || strpos($file, '..') !== false || strpos($file, '/') !== false || strpos($file, '\\') !== false) {
@@ -51,9 +52,11 @@ if (!is_file($videoPath)) {
 $thumbDir = $baseDir . '/data/thumbs';
 if (!is_dir($thumbDir)) { @mkdir($thumbDir, 0777, true); }
 
-// Build a stable cache key by path + mtime
+// Build a stable cache key by normalized path + mtime
 $mtime = @filemtime($videoPath) ?: 0;
-$hash = sha1($videoPath . '|' . $mtime);
+$normalizedPath = str_replace(['\\','/'], DIRECTORY_SEPARATOR, $videoPath);
+if (stripos(PHP_OS, 'WIN') === 0) { $normalizedPath = strtolower($normalizedPath); }
+$hash = sha1($normalizedPath . '|' . $mtime);
 $thumbPath = $thumbDir . '/' . $hash . '.jpg';
 
 // Serve cached thumbnail if exists
@@ -64,13 +67,19 @@ if (is_file($thumbPath)) {
     exit;
 }
 
-// Generate thumbnail
-// Try ffmpeg if available
+// Respect noGen=1 (dashboard and admin can control behavior)
+if ($noGen) {
+    header('Content-Type: image/png');
+    header('Cache-Control: public, max-age=300');
+    echo base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAoMBg0nQx6QAAAAASUVORK5CYII=');
+    exit;
+}
+
+// Otherwise, generate thumbnail if ffmpeg available (used by admin warmers)
 $generated = false;
 if (hasFfmpeg()) {
     $escapedIn = escapeshellarg($videoPath);
     $escapedOut = escapeshellarg($thumbPath);
-    // Grab a frame at 1s, scale to width 480 preserving aspect
     $cmd = 'ffmpeg -ss 1 -i ' . $escapedIn . ' -frames:v 1 -vf "scale=480:-1" -q:v 5 -y ' . $escapedOut . ' 2> ' . (stripos(PHP_OS, 'WIN') === 0 ? 'NUL' : '/dev/null');
     @exec($cmd, $o, $code);
     if ($code === 0 && is_file($thumbPath)) {
@@ -78,19 +87,18 @@ if (hasFfmpeg()) {
     }
 }
 
-if (!$generated) {
-    // Fallback: serve a 1x1 transparent PNG to avoid broken images
-    header('Content-Type: image/png');
-    header('Cache-Control: public, max-age=300');
-    // 1x1 transparent PNG
-    echo base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAoMBg0nQx6QAAAAASUVORK5CYII=');
+if ($generated) {
+    header('Content-Type: image/jpeg');
+    header('Cache-Control: public, max-age=604800, immutable');
+    readfile($thumbPath);
     exit;
 }
 
-// Serve the generated thumbnail
-header('Content-Type: image/jpeg');
-header('Cache-Control: public, max-age=604800, immutable');
-readfile($thumbPath);
+// Fallback placeholder
+header('Content-Type: image/png');
+header('Cache-Control: public, max-age=300');
+echo base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAoMBg0nQx6QAAAAASUVORK5CYII=');
+exit;
 ?>
 
 

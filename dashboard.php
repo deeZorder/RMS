@@ -27,6 +27,7 @@ if (file_exists($configPath)) {
 // Optional: load dashboard profile overrides
 // Support short param: d=0 → default, d=1 → dashboard1; otherwise ?dashboard=dashboardId; default → 'default'
 $selectedDashboardId = 'default';
+$d = isset($_GET['d']) ? $_GET['d'] : null;
 if (isset($_GET['d'])) {
     $n = (int)$_GET['d'];
     if ($n === 0) { $selectedDashboardId = 'default'; }
@@ -35,6 +36,7 @@ if (isset($_GET['d'])) {
     $selectedDashboardId = (string)$_GET['dashboard'];
 }
 $dashboards = [];
+$profile = null;
 if (file_exists($dashboardsPath)) {
     $decodedDash = json_decode(@file_get_contents($dashboardsPath), true);
     if (is_array($decodedDash)) { $dashboards = $decodedDash; }
@@ -107,7 +109,12 @@ if (file_exists($adminCachePath)) {
                 $videoFiles[] = ['name' => $name, 'dirIndex' => $mappedIndex];
             }
             $usedCacheForVideos = true;
+            error_log("Dashboard: Using cache with " . count($videoFiles) . " videos");
+        } else {
+            error_log("Dashboard: Cache is stale, will scan directories");
         }
+    } else {
+        error_log("Dashboard: Admin cache not found or invalid");
     }
 }
 
@@ -116,14 +123,20 @@ if (!$usedCacheForVideos) {
     foreach ($clipsDirs as $dirIndex => $clipsDir) {
         $resolved = isset($dirAbsPaths[$dirIndex]) ? $dirAbsPaths[$dirIndex] : (is_dir($clipsDir) ? $clipsDir : realpath(__DIR__ . '/' . $clipsDir));
         if ($resolved && is_dir($resolved)) {
+            error_log("Dashboard: Scanning directory $clipsDir ($resolved)");
             $items = @scandir($resolved) ?: [];
+            $foundVideos = 0;
             foreach ($items as $file) {
                 if ($file === '.' || $file === '..') { continue; }
                 $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
                 if (in_array($ext, $allowedExt, true)) {
                     $videoFiles[] = ['name' => $file, 'dirIndex' => $dirIndex];
+                    $foundVideos++;
                 }
             }
+            error_log("Dashboard: Found $foundVideos videos in $clipsDir");
+        } else {
+            error_log("Dashboard: Directory $clipsDir not found or not accessible");
         }
     }
 }
@@ -258,11 +271,11 @@ function autoUpdateVideoOrder($baseDir, $profileId, $dirAbsPaths, $videoFiles) {
 
 // Auto-update current video if it no longer exists
 function autoUpdateCurrentVideo($baseDir, $profileId, $videoFiles, $orderKeys) {
-    if (!function_exists('getCurrentVideo')) {
+    if (!function_exists('getCurrentVideoForProfile')) {
         return null; // Cannot update if function not available
     }
-    
-    $currentVideo = getCurrentVideo($profileId);
+
+    $currentVideo = getCurrentVideoForProfile($profileId);
     
     if (!empty($currentVideo['filename'])) {
         $currentFilename = $currentVideo['filename'];
@@ -284,8 +297,8 @@ function autoUpdateCurrentVideo($baseDir, $profileId, $videoFiles, $orderKeys) {
                 'filename' => $firstVideo['name'],
                 'dirIndex' => $firstVideo['dirIndex']
             ];
-            if (function_exists('setCurrentVideo')) {
-                setCurrentVideo($profileId, $firstVideo['name'], $firstVideo['dirIndex']);
+            if (function_exists('setCurrentVideoForProfile')) {
+                setCurrentVideoForProfile($profileId, $firstVideo['name'], $firstVideo['dirIndex']);
             }
             
             // Log the auto-update for debugging
@@ -298,15 +311,38 @@ function autoUpdateCurrentVideo($baseDir, $profileId, $videoFiles, $orderKeys) {
     return null;
 }
 
-// ============================================================================
-// MAIN EXECUTION CODE - Now all functions are defined and can be called
-// ============================================================================
 
 // Apply saved order if available, with smart caching based on file modification times
 $orderPath = __DIR__ . '/data/profiles/' . preg_replace('/[^a-zA-Z0-9_\-]/', '', $selectedDashboardId) . '/video_order.json';
 
 // Only scan if directories have changed since last scan
-$needsScan = isCacheStale($selectedDashboardId, $dirAbsPaths);
+// Determine if a rescan is needed without relying on a helper (silences static analysis warning)
+$needsScan = true;
+if (function_exists('getLastScan')) {
+    try {
+        $lastScanTime = getLastScan($selectedDashboardId);
+        if ($lastScanTime !== 0) {
+            $maxDirModTime = 0;
+            foreach ($dirAbsPaths as $dir) {
+                if (is_dir($dir)) {
+                    $modTime = @filemtime($dir);
+                    if ($modTime !== false) {
+                        $maxDirModTime = max($maxDirModTime, $modTime);
+                    }
+                }
+            }
+            $needsScan = $maxDirModTime > $lastScanTime;
+        } else {
+            $needsScan = true;
+        }
+    } catch (Exception $e) {
+        error_log('Error while checking cache staleness: ' . $e->getMessage());
+        $needsScan = true;
+    }
+} else {
+    error_log('getLastScan function not available - state_manager.php may not be properly included');
+    $needsScan = true;
+}
 
 if ($needsScan) {
     // Directories have changed, need to scan
@@ -341,6 +377,8 @@ if (!empty($orderKeys)) {
 } else {
     usort($videoFiles, function($a, $b){ $c=strcmp($a['name'],$b['name']); return $c!==0?$c:($a['dirIndex']<=>$b['dirIndex']); });
 }
+
+error_log("Dashboard: Final video count: " . count($videoFiles));
 
 // Distribute videos across rows
 $rows = max(1, (int)$config['rows']);
@@ -409,6 +447,15 @@ if ($dashboardBg !== '') {
         <?php endif; ?>
         <?php if (empty($videoFiles)): ?>
             <p>No videos found, please put videos in the video map or choose a different map on the admin page.</p>
+            <!-- Debug info -->
+            <div style="background: #f0f0f0; padding: 10px; margin: 10px 0; border: 1px solid #ccc; font-family: monospace;">
+                <strong>Debug Info:</strong><br>
+                Cache used: <?php echo $usedCacheForVideos ? 'Yes' : 'No'; ?><br>
+                Cache exists: <?php echo file_exists($adminCachePath) ? 'Yes' : 'No'; ?><br>
+                Videos directory: <?php echo is_dir('videos') ? 'Exists' : 'Not found'; ?><br>
+                Video count in cache: <?php echo $usedCacheForVideos ? count($videoFiles) : 'N/A'; ?><br>
+                Clips directories: <?php echo implode(', ', $clipsDirs); ?>
+            </div>
         <?php else: ?>
             <?php 
             // Define a CSS custom property to calculate item width for each row
@@ -423,9 +470,28 @@ if ($dashboardBg !== '') {
                             // Calculate style for width per item with reduced gap
                             $calcWidth = "calc((100% - " . ($clipsPerRow - 1) . " * {$gap}px) / " . $clipsPerRow . ")";
                         ?>
+                            <?php 
+                                $thumbSrc = 'thumb.php?file=' . rawurlencode($video['name']) . '&dirIndex=' . (int)$video['dirIndex'] . '&noGen=1';
+                                if (!empty($adminCache['all_video_files']) && is_array($adminCache['all_video_files'])) {
+                                    foreach ($adminCache['all_video_files'] as $entry) {
+                                        $en = isset($entry['name']) ? (string)$entry['name'] : '';
+                                        $edi = (int)($entry['dirIndex'] ?? 0);
+                                        if ($en === $video['name'] && $edi === (int)$video['dirIndex']) {
+                                            if (!empty($entry['thumb_hash'])) {
+                                                $th = (string)$entry['thumb_hash'];
+                                                $tp = __DIR__ . '/data/thumbs/' . $th . '.jpg';
+                                                if (is_file($tp)) {
+                                                    $tm = isset($entry['thumb_mtime']) ? (int)$entry['thumb_mtime'] : 0;
+                                                    $thumbSrc = 'data/thumbs/' . $th . '.jpg' . ($tm ? ('?v=' . $tm) : '');
+                                                }
+                                            }
+                                            break;
+                                        }
+                                    }
+                                }
+                            ?>
                             <div class="carousel-item" data-filename="<?php echo htmlspecialchars($video['name'], ENT_QUOTES, 'UTF-8'); ?>" data-dir-index="<?php echo (int)$video['dirIndex']; ?>" style="flex: 0 0 <?php echo $calcWidth; ?>;">
-                                <img data-src="thumb.php?file=<?php echo rawurlencode($video['name']); ?>&dirIndex=<?php echo (int)$video['dirIndex']; ?>" alt="thumbnail" class="lazy-thumb" loading="lazy" />
-                                <video data-src="preview.php?file=<?php echo rawurlencode($video['name']); ?>&dirIndex=<?php echo (int)$video['dirIndex']; ?>" class="lazy-preview-video" muted loop preload="none" style="display: none;"></video>
+                                <img data-src="<?php echo htmlspecialchars($thumbSrc, ENT_QUOTES, 'UTF-8'); ?>" alt="thumbnail" class="lazy-thumb" loading="lazy" />
                                 <div class="video-placeholder">
                                     <div class="play-icon">▶</div>
                                 </div>
@@ -477,228 +543,134 @@ if ($dashboardBg !== '') {
             try { ['log','debug','info','table'].forEach(k => { if (typeof console[k] === 'function') console[k] = function(){}; }); } catch(_) {}
         })();
         // --- Selected tile preview loop helpers ---
-        // Keep preview independent from polling by tracking active element
+        // Preview functionality disabled - only show thumbnails to prevent 404 errors
         let currentPreviewEl = null;
+        let previewRequestId = 0; // Incrementing token to invalidate stale preview loads
+        // Simple client logging helper (robust GET-based, works in kiosk/webviews)
+        function logDash(event, details = {}) {
+            try {
+                const url = 'api.php?action=log_event&' + profileQuery
+                    + '&event=' + encodeURIComponent(String(event))
+                    + '&details=' + encodeURIComponent(JSON.stringify(details))
+                    + '&t=' + Date.now();
+                // Try fetch keepalive GET first
+                if (window.fetch) {
+                    fetch(url, { method: 'GET', keepalive: true }).catch(() => {
+                        const img = new Image();
+                        img.src = url;
+                    });
+                } else {
+                    const img = new Image();
+                    img.src = url;
+                }
+            } catch(_) {}
+        }
+        
         function stopPreview() {
-            if (!currentPreviewEl) return;
-            const v = currentPreviewEl.querySelector('.lazy-preview-video');
-            if (v) {
-                try { v.pause(); } catch {}
-                v.loop = false;
-                // Release network/decoder to be safe
-                try { v.removeAttribute('src'); v.load(); } catch {}
+            if (currentPreviewEl) {
+                const v = currentPreviewEl.querySelector('video.preview');
+                if (v) v.remove();
+                const img = currentPreviewEl.querySelector('.lazy-thumb');
+                if (img) img.style.display = 'block';
+                currentPreviewEl.classList.remove('selected');
             }
-            // Ensure tile UI returns to thumbnail state
-            try { currentPreviewEl.classList.remove('previewing'); } catch {}
             currentPreviewEl = null;
         }
 
         function stopAllPreviews() {
-            document.querySelectorAll('.lazy-preview-video').forEach(v => {
-                try { v.pause(); } catch {}
-                v.loop = false;
-                try { v.removeAttribute('src'); v.load(); } catch {}
-                const item = v.closest('.carousel-item');
-                if (item) { item.classList.remove('previewing'); }
-            });
+            document.querySelectorAll('.carousel-item video.preview').forEach(v => v.remove());
+            document.querySelectorAll('.carousel-item .lazy-thumb').forEach(img => { img.style.display = 'block'; });
+            document.querySelectorAll('.carousel-item.selected').forEach(el => el.classList.remove('selected'));
             currentPreviewEl = null;
         }
 
         function startPreviewLoopForItem(item) {
-            console.log('startPreviewLoopForItem called with:', item);
             if (!item) return;
-            if (currentPreviewEl === item) return; // already previewing this tile
-            stopAllPreviews(); // hard stop any other previews before starting a new one
-
-            // Get the existing video element (should already exist from HTML generation)
-            let v = item.querySelector('.lazy-preview-video');
-            console.log('Existing preview video element:', v);
-            
-            if (!v) {
-                console.log('Creating new preview video element (fallback)');
-                v = document.createElement('video');
-                v.className = 'lazy-preview-video';
-                
-                // Standard attributes for video playback
-                v.setAttribute('muted', '');
-                v.setAttribute('playsinline', '');
-                v.setAttribute('webkit-playsinline', '');
-                v.setAttribute('x5-playsinline', '');
-                
-                // Tablet-specific attributes for better compatibility
-                v.setAttribute('x5-video-player-type', 'h5');
-                v.setAttribute('x5-video-player-fullscreen', 'false');
-                v.setAttribute('x5-video-orientation', 'portraint');
-                v.setAttribute('x5-video-same-origin', 'true');
-                
-                // iOS Safari specific attributes
-                v.setAttribute('webkit-playsinline', '');
-                v.setAttribute('playsinline', '');
-                
-                // Android TV specific attributes
-                v.setAttribute('android-keep-screen-on', 'true');
-                v.setAttribute('android-focusable', 'true');
-                v.setAttribute('android-focusable-in-touch-mode', 'true');
-                
-                // Force hardware acceleration and rendering
-                v.style.transform = 'translateZ(0)';
-                v.style.webkitTransform = 'translateZ(0)';
-                v.style.backfaceVisibility = 'hidden';
-                v.style.webkitBackfaceVisibility = 'hidden';
-                
-                v.preload = 'metadata';
-                v.autoplay = false;
-                v.loop = true; // Loop the preview video
-                
-                // Insert video before placeholder so it sits underneath the title bar but above the image
-                const placeholder = item.querySelector('.video-placeholder');
-                if (placeholder && placeholder.parentNode === item) {
-                    item.insertBefore(v, placeholder);
-                } else {
-                    item.appendChild(v);
+            // If this item is already previewing, ensure it's playing and skip restart
+            if (currentPreviewEl === item) {
+                const existingPreview = item.querySelector('video.preview');
+                if (existingPreview) {
+                    try { existingPreview.play().catch(() => {}); } catch(_) {}
+                    return;
                 }
-                console.log('Preview video element inserted, placeholder:', placeholder);
             }
-            
-            // Set up event listeners if they haven't been set up yet
-            if (!v.hasAttribute('data-listeners-setup')) {
-                v.setAttribute('data-listeners-setup', 'true');
-                
-                // When video loads, mark tile as loaded to fade placeholder
-                v.addEventListener('loadeddata', () => {
-                    console.log('Preview video loaded, adding loaded and previewing classes');
-                    item.classList.add('loaded');
-                    item.classList.add('previewing'); // hide thumbnail overlay
-                }, { once: true });
-                
-                // Add error event listener for debugging
-                v.addEventListener('error', (e) => {
-                    console.error('Preview video error event:', e);
-                    console.error('Preview video error details:', v.error);
-                });
-                
-                // Add loadstart event for debugging
-                v.addEventListener('loadstart', () => {
-                    console.log('Preview video loadstart event fired');
-                });
-                
-                // Add canplay event for debugging
-                v.addEventListener('canplay', () => {
-                    console.log('Preview video canplay event fired');
-                });
-                
-                // Add playing event for debugging
-                v.addEventListener('playing', () => {
-                    console.log('Preview video playing event fired - video should be visible now');
-                    // Force a repaint on Android TV
-                    v.style.display = 'none';
-                    v.offsetHeight; // Force reflow
-                    v.style.display = 'block';
-                });
-            }
-
-            // Build preview video URL from tile data attributes
-            const filename = item.getAttribute('data-filename') || '';
-            const dirIndex = item.getAttribute('data-dir-index') || '0';
-            
-            // Use the preview.php endpoint for animated preview loops
-            let url = 'preview.php?file=' + encodeURIComponent(filename) + '&dirIndex=' + encodeURIComponent(dirIndex);
-            
-            // Log the preview video URL being used
-            console.log('Setting preview video src to:', url);
-            console.log('Using preview.php endpoint for animated preview loops');
-            
-            if (v.src !== url) {
-                v.src = url;
-                try { v.load(); } catch (e) { console.error('Preview video load() error:', e); }
-            }
-
-            // Configure preview loop - the video will loop automatically
-            v.muted = true;
-            v.playsInline = true;
-            v.loop = true;
-
-            const kick = () => {
-                console.log('Kicking preview video playback');
-                
-                // Try to play with comprehensive error handling
-                const playPromise = v.play();
-                if (playPromise !== undefined) {
-                    playPromise.then(() => {
-                        console.log('Preview video play() succeeded');
-                        // Force visibility on Android TV after successful play
-                        setTimeout(() => {
-                            v.style.opacity = '1';
-                            v.style.visibility = 'visible';
-                            v.style.display = 'block';
-                            console.log('Forced preview video visibility on Android TV');
-                        }, 100);
-                    }).catch((err) => {
-                        console.error('Preview video play() failed:', err);
-                        console.error('Error name:', err.name);
-                        console.error('Error message:', err.message);
-                        
-                        // Try alternative approaches for tablet browsers
-                        if (err.name === 'NotAllowedError') {
-                            console.log('Autoplay blocked, trying user interaction workaround');
-                            // Some tablets require user interaction before video can play
-                            // We'll try to play again after a short delay
-                            setTimeout(() => {
-                                v.play().catch((retryErr) => {
-                                    console.error('Retry preview video play() failed:', retryErr);
-                                });
-                            }, 100);
-                        }
-                    });
-                }
-            };
-            
-            if (v.readyState >= 1) { 
-                console.log('Preview video ready, kicking immediately');
-                kick(); 
-            }
-            else {
-                console.log('Preview video not ready, waiting for loadedmetadata');
-                v.addEventListener('loadedmetadata', () => { 
-                    console.log('Preview video metadata loaded, kicking');
-                    kick(); 
-                }, { once: true });
-                
-                // Fallback timeout to force play attempt
-                setTimeout(() => { 
-                    if (v.readyState < 1) { 
-                        console.log('Fallback timeout, attempting to play preview video');
-                        v.play().catch((err) => {
-                            console.error('Fallback preview video play failed:', err);
-                        }); 
-                    } 
-                }, 150);
-            }
-
+            // Ensure no other previews are active before starting a new one
+            stopAllPreviews();
+            item.classList.add('selected');
             currentPreviewEl = item;
-            item.classList.add('previewing');
-            console.log('Preview started for item, classes:', item.className);
-            console.log('Preview video element:', v);
-            console.log('Preview video src:', v.src);
-            console.log('Preview video readyState:', v.readyState);
-            console.log('Preview video muted:', v.muted);
-            console.log('Preview video playsInline:', v.playsInline);
-            console.log('Preview video loop:', v.loop);
-            console.log('Item DOM structure:', item.innerHTML);
-            
-            // Log user agent for debugging tablet issues
-            console.log('User Agent:', navigator.userAgent);
-            console.log('Platform:', navigator.platform);
-            
-            // Android TV specific logging
-            if (navigator.userAgent.includes('Android') && navigator.userAgent.includes('Chrome')) {
-                console.log('Android TV detected - applying special rendering fixes');
-                // Force immediate visibility for Android TV
-                v.style.opacity = '1';
-                v.style.visibility = 'visible';
-                v.style.display = 'block';
-                v.style.zIndex = '999';
-            }
+            const requestId = ++previewRequestId;
+
+            const filename = item.getAttribute('data-filename');
+            const dirIndex = item.getAttribute('data-dir-index') || '0';
+
+            // Try preview via admin cache mapping first
+            fetch('data/admin_cache.json?t=' + Date.now())
+                .then(r => r.json())
+                .then(cache => {
+                    try {
+                        const files = Array.isArray(cache.all_video_files) ? cache.all_video_files : [];
+                        const match = files.find(v => v && v.name === filename && String(v.dirIndex) === String(dirIndex));
+                        if (requestId !== previewRequestId || currentPreviewEl !== item) {
+                            // Stale response; ignore
+                            return;
+                        }
+                        if (match && match.preview_hash) {
+                            // Build preview URL and attach a small muted autoplaying loop
+                            const url = 'data/previews/' + match.preview_hash + '.mp4';
+                            insertPreviewVideo(item, url);
+                        } else {
+                            // Fallback to thumbnail only
+                            showThumbOnly(item);
+                        }
+                    } catch (e) {
+                        showThumbOnly(item);
+                    }
+                })
+                .catch(() => {
+                    if (requestId !== previewRequestId || currentPreviewEl !== item) return;
+                    showThumbOnly(item);
+                });
+        }
+
+        function insertPreviewVideo(item, src) {
+            if (item !== currentPreviewEl) return; // Do not insert into stale item
+            // Hide thumb while preview plays
+            const img = item.querySelector('.lazy-thumb');
+            if (img) img.style.display = 'none';
+            const existing = item.querySelector('video.preview');
+            if (existing) existing.remove();
+            const v = document.createElement('video');
+            v.className = 'preview';
+            v.muted = true;
+            v.loop = true;
+            v.autoplay = true;
+            v.playsInline = true;
+            v.preload = 'auto';
+            v.src = src;
+            // Strongly enforce looping playback in case autoplay/loop is flaky
+            v.addEventListener('ended', () => {
+                try { v.currentTime = 0; v.play().catch(() => {}); } catch(_) {}
+            });
+            v.addEventListener('loadeddata', () => {
+                try { v.play().catch(() => {}); } catch(_) {}
+            }, { once: true });
+            v.onerror = function() {
+                // On error fallback to thumbnail
+                v.remove();
+                showThumbOnly(item);
+            };
+            const placeholder = item.querySelector('.video-placeholder');
+            if (placeholder) placeholder.before(v);
+            else item.appendChild(v);
+            // Kick off playback immediately
+            try { v.play().catch(() => {}); } catch(_) {}
+        }
+
+        function showThumbOnly(item) {
+            const img = item.querySelector('.lazy-thumb');
+            if (img) img.style.display = 'block';
+            const existing = item.querySelector('video.preview');
+            if (existing) existing.remove();
         }
         // Build profile query for API calls
         const params = new URLSearchParams(location.search);
@@ -711,6 +683,18 @@ if ($dashboardBg !== '') {
             else if (n >= 1) profileQuery = 'profile=dashboard' + n;
         } else if (params.has('dashboard')) {
             profileQuery = 'profile=' + encodeURIComponent(params.get('dashboard'));
+        }
+        
+        // Also build the profile parameter for POST requests
+        let profileParam = 'default';
+        if (params.has('profile')) {
+            profileParam = params.get('profile');
+        } else if (params.has('d')) {
+            const n = parseInt(params.get('d') || '0', 10);
+            if (n === 0) profileParam = 'default';
+            else if (n >= 1) profileParam = 'dashboard' + n;
+        } else if (params.has('dashboard')) {
+            profileParam = params.get('dashboard');
         }
         
         // Monitor config.json for changes and auto-refresh dashboard
@@ -838,6 +822,7 @@ if ($dashboardBg !== '') {
             });
             
             // Touch events for mobile
+            track.style.touchAction = 'pan-y';
             track.addEventListener('touchstart', (e) => {
                 isDragging = true;
                 dragStartX = e.touches[0].clientX;
@@ -847,12 +832,11 @@ if ($dashboardBg !== '') {
                 lastDragTime = Date.now();
                 lastDragX = e.touches[0].clientX;
                 dragVelocity = 0;
-            });
+            }, { passive: true });
             
             track.addEventListener('touchmove', (e) => {
                 if (!isDragging) return;
                 
-                e.preventDefault();
                 const dragDistance = e.touches[0].clientX - dragStartX;
                 track.scrollLeft = dragStartScrollLeft - dragDistance;
                 
@@ -864,7 +848,7 @@ if ($dashboardBg !== '') {
                 }
                 lastDragTime = currentTime;
                 lastDragX = e.touches[0].clientX;
-            });
+            }, { passive: true });
             
             track.addEventListener('touchend', () => {
                 if (isDragging) {
@@ -977,16 +961,7 @@ if ($dashboardBg !== '') {
                     const onLoaded = () => {
                         carouselItem.classList.remove('loading');
                         carouselItem.classList.add('loaded');
-                        // Ensure thumbnail overlay is visible unless the tile is explicitly previewing
-                        if (!carouselItem.classList.contains('previewing')) {
-                            // Remove any stray preview video element to prevent flicker
-                            const stray = carouselItem.querySelector('video.lazy-preview-video');
-                            if (stray) {
-                                try { stray.pause(); } catch {}
-                                try { stray.remove(); } catch {}
-                            }
-                            carouselItem.classList.remove('previewing');
-                        }
+                        // Preview functionality disabled - only show thumbnails
                         loadedVideos++;
                         updateLoadingProgress();
                         cleanup();
@@ -1049,31 +1024,24 @@ if ($dashboardBg !== '') {
             }
         }
         
-        // Performance optimization: Limit initial preview video loading
-        const maxInitialPreviews = 8; // Lower initial priority load to reduce startup cost
-        let initialPreviewCount = 0;
-        
-        document.querySelectorAll('.carousel-item').forEach((item, index) => {
-            const previewVideo = item.querySelector('.lazy-preview-video');
-            if (previewVideo && initialPreviewCount < maxInitialPreviews) {
-                // Priority load for first preview videos
-                item.style.setProperty('--load-priority', 'high');
-                initialPreviewCount++;
-            } else {
-                // Lower priority for later preview videos
-                item.style.setProperty('--load-priority', 'low');
-            }
-        });
-        
+        // Performance optimization: Thumbnails only - previews disabled
         // Load current playing video to highlight (only if there's actually a video selected)
         updateCurrentVideoDisplay();
+        // Debug: Check if videos are loaded
+        console.log('Dashboard: Found', document.querySelectorAll('.carousel-item').length, 'video items');
+
         // Add click event to each item to select video
             document.querySelectorAll('.carousel-item').forEach(item => {
             item.addEventListener('click', () => {
                 console.log('Carousel item clicked:', item);
+                logDash('tile_click', { filename: item.getAttribute('data-filename'), dirIndex: item.getAttribute('data-dir-index') });
+                // Record user selection timestamp to prevent polling interference
+                lastUserSelection = Date.now();
+                console.log('User selection recorded at timestamp:', lastUserSelection);
                 // If this item is already selected, do nothing to avoid stopping playback
                 if (item.classList.contains('playing')) {
                     console.log('Item already playing, ignoring click');
+                    logDash('tile_click_ignored_already_playing');
                     return;
                 }
 
@@ -1083,41 +1051,55 @@ if ($dashboardBg !== '') {
                 // Highlight selected
                 document.querySelectorAll('.carousel-item.playing').forEach(el => el.classList.remove('playing'));
                 item.classList.add('playing');
-                // If not playing, show preview loop; otherwise, keep preview off
-                if (currentPlaybackState !== 'play') {
-                    console.log('Starting preview loop, currentPlaybackState:', currentPlaybackState);
-                    startPreviewLoopForItem(item);
-                } else {
-                    console.log('Video is playing, stopping preview');
-                    stopPreview();
-                }
+                // Always start preview loop for the selected item
+                console.log('Starting preview loop for selected item, currentPlaybackState:', currentPlaybackState);
+                startPreviewLoopForItem(item);
                 // Send update to server
                 const formData = new FormData();
                 formData.append('filename', filename);
                 formData.append('dirIndex', String(dirIndex));
+                formData.append('profile', profileParam);
+                console.log('Setting current video:', filename, 'at dirIndex:', dirIndex);
                 fetch('api.php?action=set_current_video&' + profileQuery, {
                     method: 'POST',
                     body: formData
-                }).then(res => res.json()).then(() => {
+                }).then(res => res.json()).then((data) => {
+                    logDash('set_current_video_response', { ok: true, data });
+                    console.log('Set current video response:', data);
                     // Update current video name with custom title (controls are persistent)
                     updateVideoControlsTitle(filename, dirIndex);
 
                     // Start playing the selected video automatically
-                    fetch('api.php?action=play_video&' + profileQuery, { method: 'POST' })
+                    console.log('Starting video playback');
+                    const playForm = new FormData();
+                    playForm.append('profile', profileParam);
+                    fetch('api.php?action=play_video&' + profileQuery, { method: 'POST', body: playForm })
                         .then(res => res.json())
-                        .then(() => {
+                        .then((playData) => {
+                            logDash('play_video_response', { ok: true, data: playData });
+                            console.log('Play video response:', playData);
                             updateButtonStates('play');
+                        }).catch((error) => {
+                            logDash('play_video_error', { message: String(error) });
+                            console.error('Play video error:', error);
                         });
+                }).catch((error) => {
+                    logDash('set_current_video_error', { message: String(error) });
+                    console.error('Set current video error:', error);
                 });
             });
         });
         
         // Control button handlers
         document.getElementById('play-btn').addEventListener('click', () => {
+            // Record user action timestamp to prevent polling interference
+            lastUserSelection = Date.now();
             // Immediate visual feedback
             updateButtonStates('play');
             stopPreview();
-            fetch('api.php?action=play_video&' + profileQuery, { method: 'POST' })
+            const playForm = new FormData();
+            playForm.append('profile', profileParam);
+            fetch('api.php?action=play_video&' + profileQuery, { method: 'POST', body: playForm })
                 .then(res => res.json())
                 .then(() => {})
                 .catch(err => {
@@ -1130,7 +1112,9 @@ if ($dashboardBg !== '') {
         document.getElementById('pause-btn').addEventListener('click', () => {
             // Immediate visual feedback
             updateButtonStates('pause');
-            fetch('api.php?action=pause_video&' + profileQuery, { method: 'POST' })
+            const pauseForm = new FormData();
+            pauseForm.append('profile', profileParam);
+            fetch('api.php?action=pause_video&' + profileQuery, { method: 'POST', body: pauseForm })
                 .then(res => res.json())
                 .then(() => {
                         const sel = document.querySelector('.carousel-item.playing');
@@ -1149,12 +1133,16 @@ if ($dashboardBg !== '') {
             updateButtonStates('stop');
             
             // First stop the video
-            fetch('api.php?action=stop_video&' + profileQuery, { method: 'POST' })
+            const stopForm = new FormData();
+            stopForm.append('profile', profileParam);
+            fetch('api.php?action=stop_video&' + profileQuery, { method: 'POST', body: stopForm })
                 .then(res => res.json())
                 .then((data) => {
                     
                     // Then clear the current video selection
-                    return fetch('api.php?action=clear_current_video&' + profileQuery, { method: 'POST' });
+                    const clearForm = new FormData();
+                    clearForm.append('profile', profileParam);
+                    return fetch('api.php?action=clear_current_video&' + profileQuery, { method: 'POST', body: clearForm });
                 })
                 .then(res => res.json())
                 .then((data) => {
@@ -1211,15 +1199,17 @@ if ($dashboardBg !== '') {
                     pollErrorCount = 0; // Reset error count on success
                     updateButtonStates(data.state);
                     currentPlaybackState = data.state || 'stop';
-                    if (currentPlaybackState === 'play') {
-                        stopPreview();
-                    } else {
-                        const sel = document.querySelector('.carousel-item.playing');
-                        if (sel) startPreviewLoopForItem(sel);
+                    if (Date.now() - lastUserSelection < 4000 && currentPlaybackState === 'stop') {
+                        logDash('unexpected_stop_after_selection', { sinceSelectionMs: Date.now() - lastUserSelection });
+                    }
+                    const sel = document.querySelector('.carousel-item.playing');
+                    if (sel && (currentPreviewEl !== sel || !sel.querySelector('video.preview'))) {
+                        startPreviewLoopForItem(sel);
                     }
                 })
                 .catch((error) => {
                     pollErrorCount++;
+                    logDash('poll_playback_error', { message: String(error), count: pollErrorCount });
                     console.error('Poll error:', error.message);
                     
                     // If we get too many errors, stop polling temporarily
@@ -1261,11 +1251,9 @@ if ($dashboardBg !== '') {
                                     const di = String(j.dirIndex ?? 0);
                                     if (item.getAttribute('data-filename') === nm && item.getAttribute('data-dir-index') === di) {
                                         item.classList.add('playing');
-                                        // Only preview when not actively playing
-                                        if (currentPlaybackState !== 'play') {
+                                        // Only start preview if not already previewing this item
+                                        if (currentPreviewEl !== item || !item.querySelector('video.preview')) {
                                             startPreviewLoopForItem(item);
-                                        } else {
-                                            stopPreview();
                                         }
                                     }
                                 }
@@ -1346,7 +1334,8 @@ if ($dashboardBg !== '') {
             // Send volume update to server (scoped to current profile)
             const formData = new FormData();
             formData.append('volume', volume);
-            fetch('api.php?action=set_volume&' + profileQuery, {
+            formData.append('profile', profileParam);
+            fetch('api.php?action=set_volume', {
                 method: 'POST',
                 body: formData
             }).then(res => res.json())
@@ -1356,7 +1345,12 @@ if ($dashboardBg !== '') {
         
         // Mute button functionality (scoped to current profile)
         muteBtn.addEventListener('click', () => {
-            fetch('api.php?action=toggle_mute&' + profileQuery, { method: 'POST' })
+            const formData = new FormData();
+            formData.append('profile', profileParam);
+            fetch('api.php?action=toggle_mute', { 
+                method: 'POST',
+                body: formData
+            })
                 .then(res => res.json())
                 .then(data => {
                     updateMuteButton(data.muted);
@@ -1397,7 +1391,8 @@ if ($dashboardBg !== '') {
                 const newLoopMode = data.loop === 'on' ? 'off' : 'on';
                 const formData = new FormData();
                 formData.append('loop', newLoopMode);
-                return fetch('api.php?action=set_loop_mode&' + profileQuery, {
+                formData.append('profile', profileParam);
+                return fetch('api.php?action=set_loop_mode', {
                     method: 'POST',
                     body: formData
                 });
@@ -1413,7 +1408,8 @@ if ($dashboardBg !== '') {
                 const newPlayAllMode = data.play_all === 'on' ? 'off' : 'on';
                 const formData = new FormData();
                 formData.append('play_all', newPlayAllMode);
-                return fetch('api.php?action=set_play_all_mode&' + profileQuery, {
+                formData.append('profile', profileParam);
+                return fetch('api.php?action=set_play_all_mode', {
                     method: 'POST',
                     body: formData
                 });
@@ -1468,7 +1464,8 @@ if ($dashboardBg !== '') {
                     const newMode = data.external === 'on' ? 'off' : 'on';
                     const formData = new FormData();
                     formData.append('external', newMode);
-                    return fetch('api.php?action=set_external_audio_mode&' + profileQuery, { method: 'POST', body: formData });
+                    formData.append('profile', profileParam);
+                    return fetch('api.php?action=set_external_audio_mode', { method: 'POST', body: formData });
                 }).then(res => res.json()).then(data => {
                     setExternalAudioUI(data.external === 'on');
             }).catch(() => {});
@@ -1532,9 +1529,66 @@ if ($dashboardBg !== '') {
         // Poll every 3 seconds to keep buttons in sync (reduced from 1 second)
         setInterval(pollPlaybackState, 3000);
         // Poll every 5 seconds to keep current video display in sync (reduced from 2 seconds)
-        setInterval(updateCurrentVideoDisplay, 5000);
+        // But don't interfere with recent user selections
+        let lastUserSelection = 0;
+        setInterval(() => {
+            const timeSinceSelection = Date.now() - lastUserSelection;
+            console.log('Polling check - Time since last selection:', timeSinceSelection + 'ms');
+            // Only update if no recent user selection (within last 2 seconds)
+            if (timeSinceSelection > 2000) {
+                console.log('Updating current video display via polling');
+                updateCurrentVideoDisplay();
+            } else {
+                console.log('Skipping polling update due to recent user selection');
+            }
+        }, 5000);
         
-        // Removed refresh signal checking - not needed and was causing unnecessary refreshes
+        // Check for refresh signals from admin panel every 5 seconds
+        function checkRefreshSignal() {
+            fetch('api.php?action=check_refresh_signal&' + profileQuery)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.should_refresh) {
+                        console.log('Dashboard refresh signal received, reloading...');
+                        window.location.reload();
+                    }
+                })
+                .catch(error => {
+                    // Silently ignore errors to avoid console spam
+                    console.debug('Refresh signal check failed:', error);
+                });
+        }
+        
+        // Check for refresh signals every 5 seconds
+        setInterval(checkRefreshSignal, 5000);
+        
+        // Global error handler for video-related errors
+        window.addEventListener('error', (e) => {
+            // Only handle video-related errors
+            if (e.target && e.target.tagName === 'VIDEO') {
+                console.warn('Global video error caught:', e.error);
+                
+                // Preview functionality disabled - no preview video errors to handle
+                
+                // Prevent the error from affecting other functionality
+                e.preventDefault();
+                return false;
+            }
+        }, true);
+        
+        // Also catch unhandled promise rejections from video operations
+        window.addEventListener('unhandledrejection', (e) => {
+            if (e.reason && typeof e.reason === 'object' && e.reason.name) {
+                // Check if this is a video-related error
+                if (e.reason.name === 'NotSupportedError' || 
+                    e.reason.name === 'NotAllowedError' ||
+                    e.reason.message.includes('no supported sources')) {
+                    console.warn('Unhandled video promise rejection caught:', e.reason);
+                    e.preventDefault();
+                    return false;
+                }
+            }
+        });
         
 
     });

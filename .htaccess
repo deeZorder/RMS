@@ -1,18 +1,11 @@
 # Relax Media System .htaccess
-# Simplified for XAMPP compatibility
+# Minimal version to avoid 403 errors
 
-# Enable compression for better performance (if available)
-<IfModule mod_deflate.c>
-    AddOutputFilterByType DEFLATE text/plain
-    AddOutputFilterByType DEFLATE text/html
-    AddOutputFilterByType DEFLATE text/xml
-    AddOutputFilterByType DEFLATE text/css
-    AddOutputFilterByType DEFLATE application/xml
-    AddOutputFilterByType DEFLATE application/xhtml+xml
-    AddOutputFilterByType DEFLATE application/rss+xml
-    AddOutputFilterByType DEFLATE application/javascript
-    AddOutputFilterByType DEFLATE application/x-javascript
-    AddOutputFilterByType DEFLATE application/json
+# Enable CORS for API calls
+<IfModule mod_headers.c>
+    Header set Access-Control-Allow-Origin "*"
+    Header set Access-Control-Allow-Methods "GET, POST, OPTIONS"
+    Header set Access-Control-Allow-Headers "Content-Type, X-Requested-With"
 </IfModule>
 
 # Cache video files for better performance
@@ -21,25 +14,36 @@
     Header set Accept-Ranges "bytes"
 </FilesMatch>
 
-# Cache API responses briefly
-<FilesMatch "api\.php$">
+<IfModule mod_headers.c>
+  # Cache video files for a week; allow seeking
+  <FilesMatch "\.(mp4|webm|ogg|mov)$">
+    Header set Cache-Control "public, max-age=604800, immutable"
+    Header set Accept-Ranges "bytes"
+  </FilesMatch>
+
+  # Prevent caching of dynamic endpoints
+  <FilesMatch "^(api|video|thumb)\.php$">
     Header set Cache-Control "no-cache, no-store, must-revalidate"
     Header set Pragma "no-cache"
     Header set Expires "0"
-</FilesMatch>
-
-# Security headers (only if mod_headers is available)
-<IfModule mod_headers.c>
-    Header always set X-Content-Type-Options nosniff
-    Header always set X-Frame-Options SAMEORIGIN
-    Header always set X-XSS-Protection "1; mode=block"
-    Header always set Referrer-Policy "no-referrer"
-    Header always set Permissions-Policy "camera=(), microphone=(), geolocation=()"
+  </FilesMatch>
 </IfModule>
 
-# Enable CORS for local development (only if mod_headers is available)
+# Allow large file uploads/streams (if PHP via FPM respects .htaccess)
+php_value memory_limit 512M
+php_value max_execution_time 0
+
+# Prevent caching of API responses
+<FilesMatch "api\.php$">
+    <IfModule mod_headers.c>
+        Header set Cache-Control "no-cache, no-store, must-revalidate"
+        Header set Pragma "no-cache"
+        Header set Expires "0"
+    </IfModule>
+</FilesMatch>
+
+# Basic security headers
 <IfModule mod_headers.c>
-    Header always set Access-Control-Allow-Origin "*"
-    Header always set Access-Control-Allow-Methods "GET, POST, OPTIONS"
-    Header always set Access-Control-Allow-Headers "Content-Type"
+    Header set X-Content-Type-Options nosniff
+    Header set X-Frame-Options SAMEORIGIN
 </IfModule>

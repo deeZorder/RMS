@@ -67,6 +67,7 @@ body.dashboard-bg {
     display: flex;
     overflow: hidden;
     overflow-x: auto;
+    overflow-y: visible;
     gap: 16px;
     scroll-behavior: smooth;
     -ms-overflow-style: none;
@@ -174,18 +175,20 @@ body.dashboard-bg {
     pointer-events: none;
 }
 
-/* Preview states */
-.carousel-item.previewing img.lazy-thumb {
-    opacity: 0;
-    pointer-events: none;
+/* Preview states - replaced with simple selection highlighting */
+.carousel-item.selected {
+    transform: none;
+    box-shadow: 0 8px 25px rgba(78, 205, 196, 0.3), 0 0 0 2px rgba(78, 205, 196, 0.5);
+    border: 2px solid #4ECDC4;
 }
 
-.carousel-item.previewing video,
-.carousel-item.previewing .lazy-preview-video {
-    z-index: 1;
-    opacity: 1 !important;
-    visibility: visible !important;
-    display: block !important;
+.carousel-item.selected .video-placeholder {
+    background-color: rgba(78, 205, 196, 0.2);
+}
+
+.carousel-item.selected .play-icon {
+    color: #4ECDC4;
+    text-shadow: 0 0 10px rgba(78, 205, 196, 0.8);
 }
 
 /* Carousel arrows */
@@ -558,33 +561,41 @@ body.dashboard-bg .video-controls {
     background: rgba(0, 0, 0, 0.9);
 }
 
-.admin-carousel-item .reorder-controls {
+.admin-carousel-item .reorder-left,
+.admin-carousel-item .reorder-right {
     position: absolute;
-    top: 2px;
-    right: 2px;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    opacity: 0;
-    transition: opacity 0.2s ease;
-}
-
-.admin-carousel-item:hover .reorder-controls {
-    opacity: 1;
-}
-
-.admin-carousel-item .reorder-controls button {
+    top: 50%;
+    transform: translateY(-50%);
     background: rgba(78, 205, 196, 0.9);
     color: #fff;
     border: none;
-    border-radius: 3px;
-    padding: 2px 6px;
-    font-size: 0.7em;
+    border-radius: 999px;
+    width: 26px;
+    height: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
     cursor: pointer;
-    line-height: 1;
+    opacity: 0;
+    transition: opacity 0.2s ease, background 0.2s ease;
 }
 
-.admin-carousel-item .reorder-controls button:hover {
+.admin-carousel-item .reorder-left {
+    left: 4px;
+}
+
+.admin-carousel-item .reorder-right {
+    right: 4px;
+}
+
+.admin-carousel-item:hover .reorder-left,
+.admin-carousel-item:hover .reorder-right {
+    opacity: 1;
+}
+
+.admin-carousel-item .reorder-left:hover,
+.admin-carousel-item .reorder-right:hover {
     background: rgba(78, 205, 196, 1);
 }
 
@@ -923,6 +934,15 @@ body.dashboard-bg .video-controls {
     background-color: #2a2a2a;
     padding: 20px;
     border-bottom: 1px solid #333;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.header-actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
 }
 
 .header-content h3 {
@@ -1300,4 +1320,316 @@ body.screen-off .placeholder {
     height: 0 !important;
     overflow: hidden !important;
     clip: rect(0, 0, 0, 0) !important;
+}
+
+/* Video.js Player Styles */
+.video-js {
+    width: 100%;
+    height: 100vh;
+    background: #000;
+}
+
+.video-js.vjs-fluid {
+    padding-top: 56.25%; /* 16:9 aspect ratio */
+}
+
+.video-js .vjs-tech {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+}
+
+.video-js .vjs-poster {
+    background-size: cover;
+    background-position: center;
+}
+
+/* Ensure Video.js controls are properly styled */
+.video-js .vjs-control-bar {
+    background: rgba(0, 0, 0, 0.7);
+}
+
+.video-js .vjs-control {
+    color: #fff;
+}
+
+.video-js .vjs-progress-control .vjs-progress-holder {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.video-js .vjs-play-progress {
+    background: #4ecdc4;
+}
+
+/* Hide Video.js elements when controls are disabled */
+.video-no-controls .video-js .vjs-control-bar {
+    display: none !important;
+}
+
+.video-no-controls .video-js .vjs-big-play-button {
+    display: none !important;
+}
+
+/* Ensure fullscreen works properly */
+.video-js.vjs-fullscreen {
+    padding-top: 0;
+}
+
+.video-js.vjs-fullscreen .vjs-tech {
+    position: relative;
+}
+
+/* Responsive design for different screen sizes */
+@media (max-width: 768px) {
+    .video-js {
+        height: 100vh;
+    }
+}
+
+@media (min-width: 1200px) {
+    .video-js {
+        height: 100vh;
+    }
+}
+
+/* Screen-specific styles moved from screen.php */
+.screen-container {
+    width: 100vw;
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #000;
+}
+
+.video-container {
+    width: 100%;
+    height: 100%;
+    position: relative;
+}
+
+.message-overlay {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    color: #4ecdc4;
+    font-size: 24px;
+    z-index: 1000;
+    max-width: 80%;
+}
+
+.error-message { 
+    color: #ff4444; 
+}
+
+/* Muted indicator styles */
+.muted-indicator {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 12px 16px;
+    border-radius: 8px;
+    font-size: 14px;
+    z-index: 1000;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    transition: opacity 0.3s ease;
+    max-width: 250px;
+}
+
+.muted-indicator-content {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.muted-icon {
+    font-size: 16px;
+}
+
+.muted-text {
+    font-size: 13px;
+    opacity: 0.9;
+}
+
+@media (max-width: 768px) {
+    .muted-indicator {
+        top: 10px;
+        right: 10px;
+        max-width: 200px;
+        padding: 8px 12px;
+        font-size: 12px;
+    }
+}
+
+/* Hide all UI elements for clean display experience */
+.muted-unmute-indicator,
+.muted-indicator,
+.browser-restriction-message,
+.manual-play-overlay {
+    display: none !important;
+}
+
+/* Muted unmute indicator styles */
+.muted-unmute-indicator {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 15px;
+    border-radius: 8px;
+    font-size: 14px;
+    z-index: 1000;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    max-width: 250px;
+}
+
+.muted-unmute-content {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    align-items: center;
+}
+
+.muted-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.unmute-button {
+    background: #007bff;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: bold;
+    transition: background 0.3s ease;
+}
+
+.unmute-button:hover {
+    background: #0056b3;
+}
+
+/* Browser restriction message styles */
+.browser-restriction-message {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0, 0, 0, 0.9);
+    color: white;
+    padding: 30px;
+    border-radius: 15px;
+    font-size: 16px;
+    z-index: 10000;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    max-width: 400px;
+    text-align: center;
+}
+
+.restriction-content h3 {
+    margin-bottom: 15px;
+    color: #ff6b6b;
+}
+
+.restriction-content button {
+    background: #007bff;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 14px;
+    margin-top: 15px;
+}
+
+.restriction-content button:hover {
+    background: #0056b3;
+}
+
+/* Manual play button overlay styles */
+.manual-play-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    backdrop-filter: blur(8px);
+}
+
+.manual-play-content {
+    text-align: center;
+    color: white;
+}
+
+.manual-play-btn {
+    background: linear-gradient(135deg, #007bff, #0056b3);
+    border: none;
+    border-radius: 50px;
+    padding: 20px 40px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 8px 25px rgba(0, 123, 255, 0.4);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    min-width: 200px;
+}
+
+.manual-play-btn:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 30px rgba(0, 123, 255, 0.5);
+}
+
+.play-icon {
+    font-size: 32px;
+    font-weight: bold;
+}
+
+.play-text {
+    font-size: 18px;
+    font-weight: bold;
+}
+
+.manual-play-hint {
+    margin-top: 15px;
+    opacity: 0.8;
+    font-size: 14px;
+}
+
+@media (max-width: 768px) {
+    .manual-play-btn {
+        padding: 15px 30px;
+        min-width: 180px;
+    }
+
+    .play-icon {
+        font-size: 28px;
+    }
+
+    .play-text {
+        font-size: 16px;
+    }
+
+    .manual-play-hint {
+        font-size: 12px;
+    }
 }

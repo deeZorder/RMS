@@ -90,8 +90,13 @@ function loadState($profileId) {
         'lastConfigCheck' => 0,
         'lastScan' => 0
     ];
-    
-    return array_merge($defaults, $state);
+
+    $state = array_merge($defaults, $state);
+
+    // Validate state consistency
+    $state = validateStateConsistency($state);
+
+    return $state;
 }
 
 function saveState($profileId, $state) {
@@ -101,9 +106,14 @@ function saveState($profileId, $state) {
 }
 
 function updateState($profileId, $updates) {
+    error_log("StateManager: updateState called with: $profileId, updates: " . json_encode($updates));
     $state = loadState($profileId);
+    error_log("StateManager: current state before update: " . json_encode($state));
     $state = array_merge($state, $updates);
-    return saveState($profileId, $state);
+    error_log("StateManager: state after merge: " . json_encode($state));
+    $result = saveState($profileId, $state);
+    error_log("StateManager: updateState result: " . ($result ? 'success' : 'failed'));
+    return $result;
 }
 
 function triggerDashboardRefresh($profileId) {
@@ -118,11 +128,17 @@ function triggerDashboardRefresh($profileId) {
 
 function safeFileWrite($path, $content) {
     try {
+        error_log("StateManager: safeFileWrite called with path: $path");
         $tempPath = $path . '.tmp';
+        error_log("StateManager: writing to temp path: $tempPath");
         if (file_put_contents($tempPath, $content) === false) {
+            error_log("StateManager: failed to write to temp file");
             return false;
         }
-        return rename($tempPath, $path);
+        error_log("StateManager: renaming temp file to final path");
+        $result = rename($tempPath, $path);
+        error_log("StateManager: rename result: " . ($result ? 'success' : 'failed'));
+        return $result;
     } catch (Exception $e) {
         error_log('File write error: ' . $e->getMessage());
         return false;
@@ -223,16 +239,39 @@ function migrateOldStateFiles($profileId) {
 }
 
 // Helper function to get current video data
-function getCurrentVideo($profileId) {
+function getCurrentVideoForProfile($profileId) {
     $state = loadState($profileId);
     return $state['currentVideo'];
 }
 
 // Helper function to set current video
-function setCurrentVideo($profileId, $filename, $dirIndex) {
-    return updateState($profileId, [
+function setCurrentVideoForProfile($profileId, $filename, $dirIndex) {
+    error_log("StateManager: setCurrentVideoForProfile called with: $profileId, $filename, $dirIndex");
+
+    $updates = [
         'currentVideo' => ['filename' => $filename, 'dirIndex' => $dirIndex]
-    ]);
+    ];
+
+    // If clearing video (empty filename), also stop playback
+    if (empty($filename)) {
+        $updates['playbackState'] = 'stop';
+        error_log("StateManager: Clearing video, setting playback to stop");
+    }
+
+    $result = updateState($profileId, $updates);
+    error_log("StateManager: setCurrentVideoForProfile result: " . ($result ? 'success' : 'failed'));
+    return $result;
+}
+
+// Helper function to clear current video
+function clearCurrentVideo($profileId) {
+    $updates = [
+        'currentVideo' => ['filename' => '', 'dirIndex' => 0],
+        'playbackState' => 'stop'
+    ];
+
+    error_log("StateManager: Clearing current video and setting playback to stop");
+    return updateState($profileId, $updates);
 }
 
 // Helper function to get playback state
@@ -243,6 +282,12 @@ function getPlaybackState($profileId) {
 
 // Helper function to set playback state
 function setPlaybackState($profileId, $state) {
+    // Validate state consistency - if no video is selected, can't be playing
+    $currentVideo = getCurrentVideoForProfile($profileId);
+    if (empty($currentVideo['filename']) && $state === 'play') {
+        error_log("StateManager: Preventing play state with no video selected, setting to stop");
+        $state = 'stop';
+    }
     return updateState($profileId, ['playbackState' => $state]);
 }
 
@@ -321,6 +366,38 @@ function updateLastConfigCheck($profileId) {
 function getLastConfigCheck($profileId) {
     $state = loadState($profileId);
     return $state['lastConfigCheck'];
+}
+
+// Function to validate and fix state consistency
+function validateStateConsistency($state) {
+    // If no video is selected, playback state should not be 'play'
+    if (empty($state['currentVideo']['filename']) && $state['playbackState'] === 'play') {
+        error_log("StateManager: Fixing inconsistent state - no video selected but playbackState is 'play', setting to 'stop'");
+        $state['playbackState'] = 'stop';
+    }
+
+    // Handle duplicate/conflicting fields (legacy support)
+    if (isset($state['loop']) && isset($state['loopMode'])) {
+        if ($state['loop'] !== $state['loopMode']) {
+            error_log("StateManager: Conflicting loop values detected, using loopMode: " . $state['loopMode']);
+        }
+        unset($state['loop']); // Remove duplicate field
+    } elseif (isset($state['loop']) && !isset($state['loopMode'])) {
+        $state['loopMode'] = $state['loop'];
+        unset($state['loop']);
+    }
+
+    if (isset($state['play_all']) && isset($state['playAllMode'])) {
+        if ($state['play_all'] !== $state['playAllMode']) {
+            error_log("StateManager: Conflicting play_all values detected, using playAllMode: " . $state['playAllMode']);
+        }
+        unset($state['play_all']); // Remove duplicate field
+    } elseif (isset($state['play_all']) && !isset($state['playAllMode'])) {
+        $state['playAllMode'] = $state['play_all'];
+        unset($state['play_all']);
+    }
+
+    return $state;
 }
 
 // Removed refresh helper functions - not needed

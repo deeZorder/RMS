@@ -119,25 +119,44 @@ class SystemHandler extends BaseHandler {
     }
     
     private function checkRefreshSignal(): void {
-        $profileDir = $this->baseDir . '/data/profiles/' . preg_replace('/[^a-zA-Z0-9_\-]/', '', $this->profileId);
-        $dashboardRefreshPath = $profileDir . '/dashboard_refresh.txt';
-        
-        // Check profile-specific refresh first, then global legacy
         $shouldRefresh = false;
-        $candidates = [ 
-            $dashboardRefreshPath, 
-            $this->baseDir . '/data/dashboard_refresh.txt', 
-            $this->baseDir . '/dashboard_refresh.txt' 
-        ];
         
-        foreach ($candidates as $refreshFile) {
-            if (file_exists($refreshFile)) {
-                $lastRefresh = (int)@file_get_contents($refreshFile);
-                $currentTime = time();
-                if ($currentTime - $lastRefresh < 10) {
-                    $shouldRefresh = true;
-                    @unlink($refreshFile);
-                    break;
+        // Check state.json for refresh request
+        $state = loadState($this->profileId);
+        
+        if (isset($state['refreshRequested']) && $state['refreshRequested'] === true) {
+            $lastRefreshTrigger = isset($state['lastRefreshTrigger']) ? (int)$state['lastRefreshTrigger'] : 0;
+            $currentTime = time();
+            
+            // If refresh was triggered within the last 30 seconds, trigger refresh
+            if ($currentTime - $lastRefreshTrigger < 30) {
+                $shouldRefresh = true;
+                
+                // Clear the refresh request flag to prevent repeated refreshes
+                updateState($this->profileId, ['refreshRequested' => false]);
+            }
+        }
+        
+        // Fallback: Check legacy dashboard_refresh.txt files for backwards compatibility
+        if (!$shouldRefresh) {
+            $profileDir = $this->baseDir . '/data/profiles/' . preg_replace('/[^a-zA-Z0-9_\-]/', '', $this->profileId);
+            $dashboardRefreshPath = $profileDir . '/dashboard_refresh.txt';
+            
+            $candidates = [ 
+                $dashboardRefreshPath, 
+                $this->baseDir . '/data/dashboard_refresh.txt', 
+                $this->baseDir . '/dashboard_refresh.txt' 
+            ];
+            
+            foreach ($candidates as $refreshFile) {
+                if (file_exists($refreshFile)) {
+                    $lastRefresh = (int)@file_get_contents($refreshFile);
+                    $currentTime = time();
+                    if ($currentTime - $lastRefresh < 10) {
+                        $shouldRefresh = true;
+                        @unlink($refreshFile);
+                        break;
+                    }
                 }
             }
         }
@@ -148,12 +167,19 @@ class SystemHandler extends BaseHandler {
     private function triggerDashboardRefresh(): void {
         if (!$this->validatePostRequest()) return;
         
-        $profileDir = $this->baseDir . '/data/profiles/' . preg_replace('/[^a-zA-Z0-9_\-]/', '', $this->profileId);
-        if (!is_dir($profileDir)) { @mkdir($profileDir, 0777, true); }
-        $dashboardRefreshPath = $profileDir . '/dashboard_refresh.txt';
+        // Use state-based refresh mechanism
+        $updates = [
+            'lastRefreshTrigger' => time(),
+            'refreshRequested' => true
+        ];
         
-        // Create a refresh trigger file
-        file_put_contents($dashboardRefreshPath, time());
-        echo json_encode(['status' => 'ok', 'message' => 'Refresh signal sent']);
+        $success = updateState($this->profileId, $updates);
+        
+        if ($success) {
+            echo json_encode(['status' => 'ok', 'message' => 'Refresh signal sent']);
+        } else {
+            http_response_code(500);
+            echo json_encode(['status' => 'error', 'message' => 'Failed to trigger refresh signal']);
+        }
     }
 }

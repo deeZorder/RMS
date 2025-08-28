@@ -79,8 +79,10 @@ class APIRouter {
         
         // Admin
         'warm_thumbnails' => 'AdminHandler',
+        'warm_previews' => 'AdminHandler',
         'check_ffmpeg' => 'AdminHandler',
         'browse_directories' => 'AdminHandler',
+        'upload_files' => 'AdminHandler',
         
         // Batch operations
         'get_dashboard_state' => 'BatchHandler',

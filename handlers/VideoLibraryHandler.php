@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . '/BaseHandler.php';
+require_once __DIR__ . '/../state_manager.php';
 
 // Ensure BaseHandler class is available for static analysis
 if (!class_exists('BaseHandler')) {
@@ -440,7 +441,7 @@ class VideoLibraryHandler extends BaseHandler {
         // Update current video if needed
         if (!empty($newOrder)) {
             $firstVideo = $allVideos[0];
-            updateState($this->profileId, [
+            \updateState($this->profileId, [
                 'currentVideo' => [
                     'filename' => $firstVideo['name'], 
                     'dirIndex' => $firstVideo['dirIndex']
