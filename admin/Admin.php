@@ -477,6 +477,7 @@ private $baseDir;
                         <button type="button" id="generate-thumbs-btn" class="btn btn-primary">🖼️ Generate Thumbnails</button>
                         <button type="button" id="generate-previews-btn" class="btn btn-primary">🎬 Generate Previews</button>
                         <button type="button" id="stop-processes-btn" class="btn btn-danger">⏹️ Stop All Processes</button>
+                        <button type="button" id="reindex-previews-btn" class="btn secondary">↻ Reindex Previews</button>
                         <form method="post" action="admin.php" onsubmit="return confirm('Delete ALL generated thumbnails and custom titles? This cannot be undone.');" style="display:inline;">
                             <input type="hidden" name="current_section" value="clear-thumbs-titles" data-fixed>
                             <button type="submit" class="btn secondary">🧹 Clear Titles, Thumbnails & Previews</button>

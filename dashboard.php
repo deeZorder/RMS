@@ -68,7 +68,7 @@ foreach ($clipsDirs as $dirIndex => $clipsDir) {
 }
 
 $videoFiles = [];
-$allowedExt = ['mp4', 'webm', 'ogg', 'mov'];
+$allowedExt = ['mp4', 'webm', 'ogg', 'mov', 'mkv', 'avi', 'wmv', 'flv'];
 
 // Prefer using admin cache to avoid rescanning directories on every dashboard load
 $adminCachePath = __DIR__ . '/data/admin_cache.json';
@@ -619,7 +619,7 @@ if ($dashboardBg !== '') {
                             const url = 'data/previews/' + match.preview_hash + '.mp4';
                             insertPreviewVideo(item, url);
                         } else {
-                            // Fallback to thumbnail only
+                            // No preview mapped for this video: show thumbnail only (no request)
                             showThumbOnly(item);
                         }
                     } catch (e) {
@@ -628,6 +628,7 @@ if ($dashboardBg !== '') {
                 })
                 .catch(() => {
                     if (requestId !== previewRequestId || currentPreviewEl !== item) return;
+                    // On error, keep thumbnail only
                     showThumbOnly(item);
                 });
         }

@@ -21,6 +21,23 @@ document.addEventListener('DOMContentLoaded', function() {
     initializeDashboardControls();
     initializeModals();
     initializeProcessStopping();
+    // Initialize preview reindex button
+    (function(){
+        var btn = document.getElementById('reindex-previews-btn');
+        if (!btn) return;
+        btn.addEventListener('click', function(){
+            var old = btn.textContent;
+            btn.disabled = true; btn.textContent = 'Reindexing…';
+            fetch('api.php?action=reindex_previews')
+                .then(function(r){ return r.json(); })
+                .then(function(d){
+                    alert('Reindex complete. Mapped: ' + (d.mapped || 0) + ' / ' + (d.total || 0) + (d.updated ? (' (updated '+d.updated+')') : ''));
+                    location.reload();
+                })
+                .catch(function(){ alert('Reindex failed'); })
+                .finally(function(){ btn.disabled = false; btn.textContent = old; });
+        });
+    })();
     
     // Initialize with URL parameters or default section
     var urlParams = new URLSearchParams(window.location.search);

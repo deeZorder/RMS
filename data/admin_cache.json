@@ -1,5 +1,5 @@
 {
-    "last_scan": 1756367377,
+    "last_scan": 1756459681,
     "available_directories": [
         ".git",
         "admin",
@@ -7,82 +7,147 @@
         "handlers",
         "videos"
     ],
-    "total_videos": 15,
+    "total_videos": 20,
     "all_video_files": [
+        {
+            "name": "Alien Worlds.mkv",
+            "dirIndex": 0,
+            "path": "videos\\Alien Worlds.mkv",
+            "preview_hash": "6e7930038aff3c060d2b21ed34b3acebf347e2a0",
+            "preview_mtime": 1756453954
+        },
         {
             "name": "Altai Mountains.mp4",
             "dirIndex": 0,
-            "path": "videos\\Altai Mountains.mp4"
+            "path": "videos\\Altai Mountains.mp4",
+            "preview_hash": "328e11c988b1363f667af54d39614546cc51e49e",
+            "preview_mtime": 1755596161
         },
         {
             "name": "Amazon.mp4",
             "dirIndex": 0,
-            "path": "videos\\Amazon.mp4"
+            "path": "videos\\Amazon.mp4",
+            "preview_hash": "1c4f0bf27a3a37537595841da99509d6ca93017f",
+            "preview_mtime": 1755598823
         },
         {
             "name": "Blue Aquarium.mp4",
             "dirIndex": 0,
-            "path": "videos\\Blue Aquarium.mp4"
+            "path": "videos\\Blue Aquarium.mp4",
+            "preview_hash": "d1c6292fde4d9c8233fa90173c28b53287528bcd",
+            "preview_mtime": 1755594103
         },
         {
             "name": "Chobe Safari.mp4",
             "dirIndex": 0,
-            "path": "videos\\Chobe Safari.mp4"
+            "path": "videos\\Chobe Safari.mp4",
+            "preview_hash": "d7a38baff218d9bc6174f2d983d2861ffa1d5778",
+            "preview_mtime": 1755597178
         },
         {
             "name": "Forest River.mp4",
             "dirIndex": 0,
-            "path": "videos\\Forest River.mp4"
+            "path": "videos\\Forest River.mp4",
+            "preview_hash": "985f6d1ca8b5cef62935eaca2a569be48da23a77",
+            "preview_mtime": 1755593132
+        },
+        {
+            "name": "Fractal Therapy.mkv",
+            "dirIndex": 0,
+            "path": "videos\\Fractal Therapy.mkv",
+            "preview_hash": "c1bf23f2e80302be769d7d29cde0299dc71fff16",
+            "preview_mtime": 1756392174
         },
         {
             "name": "Green Forest.mp4",
             "dirIndex": 0,
-            "path": "videos\\Green Forest.mp4"
+            "path": "videos\\Green Forest.mp4",
+            "preview_hash": "02579d95feae8d590b915bf915cb3cfac8acc5bd",
+            "preview_mtime": 1755538660
         },
         {
             "name": "Hot Tub Ocean.mp4",
             "dirIndex": 0,
-            "path": "videos\\Hot Tub Ocean.mp4"
+            "path": "videos\\Hot Tub Ocean.mp4",
+            "preview_hash": "5a78d432c5bc4e162590bd697f8137cb5ebd2fba",
+            "preview_mtime": 1755592319
         },
         {
             "name": "Khwai River.mp4",
             "dirIndex": 0,
-            "path": "videos\\Khwai River.mp4"
+            "path": "videos\\Khwai River.mp4",
+            "preview_hash": "cd6aeac661605c02efebc2bf88e6c527defc8e9c",
+            "preview_mtime": 1755595744
+        },
+        {
+            "name": "Mind Journey.mkv",
+            "dirIndex": 0,
+            "path": "videos\\Mind Journey.mkv",
+            "preview_hash": "07989e7833ac3aa93faaac2d5f081ddc36d95266",
+            "preview_mtime": 1756392159
         },
         {
             "name": "Misty Trail.mp4",
             "dirIndex": 0,
-            "path": "videos\\Misty Trail.mp4"
+            "path": "videos\\Misty Trail.mp4",
+            "preview_hash": "8007c91a536bda6e43872d17e47a8bab71455cdb",
+            "preview_mtime": 1755586246
         },
         {
             "name": "Mountain River.mp4",
             "dirIndex": 0,
-            "path": "videos\\Mountain River.mp4"
+            "path": "videos\\Mountain River.mp4",
+            "preview_hash": "a5370e498ed3324e22eb28c024b0bf645ca5e81c",
+            "preview_mtime": 1755594598
         },
         {
             "name": "New Zealand Tour.mp4",
             "dirIndex": 0,
-            "path": "videos\\New Zealand Tour.mp4"
+            "path": "videos\\New Zealand Tour.mp4",
+            "preview_hash": "ce63ebe041f14271a717391dff6c964225e4fcfd",
+            "preview_mtime": 1755598322
         },
         {
             "name": "Rocky Beach.mp4",
             "dirIndex": 0,
-            "path": "videos\\Rocky Beach.mp4"
+            "path": "videos\\Rocky Beach.mp4",
+            "preview_hash": "e60080e2beffe1de23e6b060aec7022a8e3dc1d5",
+            "preview_mtime": 1755164732
+        },
+        {
+            "name": "Sacred Geometry.mkv",
+            "dirIndex": 0,
+            "path": "videos\\Sacred Geometry.mkv",
+            "preview_hash": "d9d09d57ca0aafafd2a674081b00b6b204712946",
+            "preview_mtime": 1756392376
+        },
+        {
+            "name": "Soul Eternal.mkv",
+            "dirIndex": 0,
+            "path": "videos\\Soul Eternal.mkv",
+            "preview_hash": "315dc98d0aaa7f374d38988668650d18cff0a58a",
+            "preview_mtime": 1756392118
         },
         {
             "name": "Sunset Beach.mp4",
             "dirIndex": 0,
-            "path": "videos\\Sunset Beach.mp4"
+            "path": "videos\\Sunset Beach.mp4",
+            "preview_hash": "a1e08b2360544f13a50b7a18fad7a3756205e50c",
+            "preview_mtime": 1755161268
         },
         {
             "name": "Swiss Alps.mp4",
             "dirIndex": 0,
-            "path": "videos\\Swiss Alps.mp4"
+            "path": "videos\\Swiss Alps.mp4",
+            "preview_hash": "b3498cc862aea2c8b662a499cd79f812022ab462",
+            "preview_mtime": 1755595172
         },
         {
             "name": "Tropical Island.mp4",
             "dirIndex": 0,
-            "path": "videos\\Tropical Island.mp4"
+            "path": "videos\\Tropical Island.mp4",
+            "preview_hash": "a76793021ffae30ca32fc4687b8369ca58cf2f36",
+            "preview_mtime": 1755589459
         }
     ],
     "available_backgrounds": [

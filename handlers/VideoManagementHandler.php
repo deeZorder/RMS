@@ -161,7 +161,7 @@ class VideoManagementHandler extends BaseHandler {
         
         $state = loadState($this->profileId);
         $dirs = $this->getConfiguredDirectories();
-        $allowedExt = ['mp4', 'webm', 'ogg', 'mov'];
+        $allowedExt = ['mp4', 'webm', 'ogg', 'mov', 'mkv', 'avi', 'wmv', 'flv'];
         $allWithMeta = $this->buildAllVideosList($dirs, $allowedExt);
         $savedOrder = $this->loadVideoOrder();
 

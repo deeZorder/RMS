@@ -289,6 +289,9 @@ switch ($action) {
     case 'warm_previews':
         warmPreviews();
         break;
+    case 'reindex_previews':
+        reindexPreviews();
+        break;
 
     case 'browse_directories':
         browseDirectories();
@@ -556,19 +559,6 @@ function warmThumbnails() {
             }
         }
         
-        $total = count($all);
-        if ($total === 0) {
-            echo json_encode([
-                'status' => 'ok', 
-                'total' => 0, 
-                'processed' => 0, 
-                'failed' => 0, 
-                'remaining' => 0, 
-                'nextOffset' => $offset
-            ]);
-            return;
-        }
-        
         // Build list of targets that actually need thumbnail generation (skip existing)
         $targets = [];
         foreach ($all as $entry) {
@@ -588,14 +578,30 @@ function warmThumbnails() {
                 $np = str_replace(['\\','/'], DIRECTORY_SEPARATOR, $videoPath);
                 if (stripos(PHP_OS, 'WIN') === 0) { $np = strtolower($np); }
                 $hash = sha1($np . '|' . $mtime);
-                $previewPathCheck = __DIR__ . '/data/previews/' . $hash . '.mp4';
-                if (!is_file($previewPathCheck)) {
+                // For thumbnails, check the thumbnail cache (not previews)
+                $thumbPathCheck = rtrim($thumbDir, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . $hash . '.jpg';
+                if (!is_file($thumbPathCheck)) {
                     $targets[] = $entry;
                 }
             }
         }
 
-        $end = min(count($targets), $offset + $batch);
+        // Total should reflect the number of targets that actually need work
+        $totalTargets = count($targets);
+        // If nothing to do, short-circuit cleanly
+        if ($totalTargets === 0) {
+            echo json_encode([
+                'status' => 'ok',
+                'total' => 0,
+                'processed' => 0,
+                'failed' => 0,
+                'remaining' => 0,
+                'nextOffset' => $offset
+            ]);
+            return;
+        }
+
+        $end = min($totalTargets, $offset + $batch);
         $processed = 0;
         $failed = 0;
 
@@ -705,10 +711,11 @@ function warmThumbnails() {
             }
         }
         
-        $remaining = max(0, $total - $end);
+        // Remaining should be computed against the filtered target set
+        $remaining = max(0, $totalTargets - $end);
         echo json_encode([
             'status' => 'ok',
-            'total' => $total, 
+            'total' => $totalTargets, 
             'processed' => $processed, 
             'failed' => $failed,
             'remaining' => $remaining, 
@@ -744,19 +751,6 @@ function warmPreviews() {
             }
         }
         
-        $total = count($all);
-        if ($total === 0) {
-            echo json_encode([
-                'status' => 'ok', 
-                'total' => 0, 
-                'processed' => 0, 
-                'failed' => 0, 
-                'remaining' => 0, 
-                'nextOffset' => $offset
-            ]);
-            return;
-        }
-        
         // Build list of targets that actually need generation (skip existing)
         $targets = [];
         foreach ($all as $entry) {
@@ -784,7 +778,22 @@ function warmPreviews() {
             }
         }
 
-        $end = min(count($targets), $offset + $batch);
+        // Total should reflect the number of targets that actually need work
+        $totalTargets = count($targets);
+        // If nothing to do, short-circuit cleanly
+        if ($totalTargets === 0) {
+            echo json_encode([
+                'status' => 'ok',
+                'total' => 0,
+                'processed' => 0,
+                'failed' => 0,
+                'remaining' => 0,
+                'nextOffset' => $offset
+            ]);
+            return;
+        }
+
+        $end = min($totalTargets, $offset + $batch);
         $processed = 0;
         $failed = 0;
         
@@ -896,10 +905,11 @@ function warmPreviews() {
             }
         }
         
-        $remaining = max(0, $total - $end);
+        // Remaining should be computed against the filtered target set
+        $remaining = max(0, $totalTargets - $end);
         echo json_encode([
             'status' => 'ok',
-            'total' => $total, 
+            'total' => $totalTargets, 
             'processed' => $processed, 
             'failed' => $failed,
             'remaining' => $remaining, 
@@ -911,6 +921,86 @@ function warmPreviews() {
             'status' => 'error',
             'error' => $e->getMessage()
         ]);
+    }
+}
+
+function reindexPreviews() {
+    try {
+        $adminCachePath = __DIR__ . '/data/admin_cache.json';
+        $previewDir = __DIR__ . '/data/previews';
+        if (!is_file($adminCachePath)) {
+            echo json_encode(['status' => 'ok', 'updated' => 0, 'total' => 0, 'missing' => 0, 'message' => 'admin_cache.json not found']);
+            return;
+        }
+        $cache = json_decode(@file_get_contents($adminCachePath), true) ?: [];
+        if (empty($cache['all_video_files']) || !is_array($cache['all_video_files'])) {
+            echo json_encode(['status' => 'ok', 'updated' => 0, 'total' => 0, 'missing' => 0, 'message' => 'No videos in cache']);
+            return;
+        }
+        $all = &$cache['all_video_files'];
+        $updated = 0;
+        $total = count($all);
+        foreach ($all as &$entry) {
+            $name = isset($entry['name']) ? (string)$entry['name'] : '';
+            $di = (int)($entry['dirIndex'] ?? 0);
+            if ($name === '') { continue; }
+            // Resolve video path similar to warmers
+            $videoPath = '';
+            if (!empty($entry['path'])) {
+                $videoPath = (string)$entry['path'];
+            } else {
+                $dirs = getConfiguredDirectories();
+                if (isset($dirs[$di])) {
+                    $sep = (strpos($dirs[$di], ':\\') !== false) ? '\\' : '/';
+                    $videoPath = rtrim($dirs[$di], '\\/') . $sep . $name;
+                }
+            }
+            if ($videoPath === '' || !is_file($videoPath)) { continue; }
+            $mtime = @filemtime($videoPath) ?: 0;
+            // Build candidate hashes matching preview.php logic
+            $candidates = [];
+            $absPath = $videoPath;
+            $relPath = rtrim((string)(getConfiguredDirectories()[$di] ?? 'videos'), '\\/') . DIRECTORY_SEPARATOR . $name;
+            if (strpos($relPath, __DIR__ . DIRECTORY_SEPARATOR) === 0) {
+                $relPath = substr($relPath, strlen(__DIR__ . DIRECTORY_SEPARATOR));
+            }
+            foreach ([$absPath, $relPath] as $p) {
+                $np_os = str_replace(['\\','/'], DIRECTORY_SEPARATOR, $p);
+                $candidates[] = sha1($np_os . '|' . $mtime);
+                $candidates[] = sha1($np_os . '|' . $mtime . '|preview');
+                $np_os_lower = (stripos(PHP_OS, 'WIN') === 0) ? strtolower($np_os) : $np_os;
+                $candidates[] = sha1($np_os_lower . '|' . $mtime);
+                $candidates[] = sha1($np_os_lower . '|' . $mtime . '|preview');
+                $np_fwd = str_replace(['\\','/'], '/', $p);
+                $candidates[] = sha1($np_fwd . '|' . $mtime);
+                $candidates[] = sha1($np_fwd . '|' . $mtime . '|preview');
+                $np_fwd_lower = (stripos(PHP_OS, 'WIN') === 0) ? strtolower($np_fwd) : $np_fwd;
+                $candidates[] = sha1($np_fwd_lower . '|' . $mtime);
+                $candidates[] = sha1($np_fwd_lower . '|' . $mtime . '|preview');
+            }
+            $foundHash = null;
+            foreach (array_unique($candidates) as $h) {
+                $p = $previewDir . DIRECTORY_SEPARATOR . $h . '.mp4';
+                if (is_file($p)) { $foundHash = $h; break; }
+            }
+            if ($foundHash) {
+                if (empty($entry['preview_hash']) || $entry['preview_hash'] !== $foundHash) {
+                    $entry['preview_hash'] = $foundHash;
+                    $entry['preview_mtime'] = $mtime;
+                    $updated++;
+                }
+            }
+        }
+        unset($entry);
+        // Save back if updated
+        if ($updated > 0) {
+            @file_put_contents($adminCachePath, json_encode($cache, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+        }
+        $mapped = 0;
+        foreach ($all as $e) { if (!empty($e['preview_hash'])) $mapped++; }
+        echo json_encode(['status' => 'ok', 'updated' => $updated, 'total' => $total, 'mapped' => $mapped, 'missing' => max(0, $total - $mapped)]);
+    } catch (Exception $e) {
+        echo json_encode(['status' => 'error', 'error' => $e->getMessage()]);
     }
 }
 

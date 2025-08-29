@@ -136,7 +136,7 @@ class VideoLibraryHandler extends BaseHandler {
         $page = max(1, (int)($_GET['page'] ?? 1));
         $limit = min(100, max(10, (int)($_GET['limit'] ?? 50)));
         $offset = ($page - 1) * $limit;
-        $allowedExt = ['mp4', 'webm', 'ogg', 'mov'];
+        $allowedExt = ['mp4', 'webm', 'ogg', 'mov', 'mkv', 'avi', 'wmv', 'flv'];
         
         // Prefer using admin cache to avoid rescanning large directories on every request
         $allWithMeta = [];
@@ -284,7 +284,7 @@ class VideoLibraryHandler extends BaseHandler {
         if ($dirIndex < 0 || $dirIndex >= count($dirs)) { 
             $dirIndex = 0; 
         }
-        $allowedExt = ['mp4', 'webm', 'ogg', 'mov'];
+        $allowedExt = ['mp4', 'webm', 'ogg', 'mov', 'mkv', 'avi', 'wmv', 'flv'];
         $allWithMeta = $this->buildAllVideosList($dirs, $allowedExt);
 
         // Build ordered list (per profile)
@@ -425,7 +425,7 @@ class VideoLibraryHandler extends BaseHandler {
     
     private function forceRefreshVideos(): void {
         $dirs = $this->getConfiguredDirectories();
-        $allowedExt = ['mp4', 'webm', 'ogg', 'mov'];
+        $allowedExt = ['mp4', 'webm', 'ogg', 'mov', 'mkv', 'avi', 'wmv', 'flv'];
         $allVideos = $this->buildAllVideosList($dirs, $allowedExt);
         
         // Generate new order

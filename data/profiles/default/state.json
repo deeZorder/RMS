@@ -1,17 +1,17 @@
 {
     "currentVideo": {
-        "filename": "Khwai River.mp4",
+        "filename": "Sacred Geometry.mkv",
         "dirIndex": 0
     },
     "playbackState": "play",
-    "volume": 70,
+    "volume": 25,
     "muted": false,
     "loopMode": "off",
     "playAllMode": "off",
     "externalAudioMode": "off",
-    "lastControlChange": 1756377188,
+    "lastControlChange": 1756460379,
     "lastConfigCheck": 0,
-    "lastScan": 1756113467,
-    "lastRefreshTrigger": 1756367377,
+    "lastScan": 1756454048,
+    "lastRefreshTrigger": 1756459681,
     "refreshRequested": true
 }

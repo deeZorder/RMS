@@ -135,11 +135,44 @@ if (!$previewPath) {
         exit;
     }
     
-    // Build a stable cache key by path + mtime (same as admin system)
-    $normalizedPath = str_replace(['\\', '/'], '/', $videoPath);
+    // Build possible cache keys by path + mtime across hashing variants
     $mtime = @filemtime($videoPath) ?: 0;
-    $hash = sha1($normalizedPath . '|' . $mtime . '|preview');
-    $previewPath = $baseDir . '/data/previews/' . $hash . '.mp4';
+    $candidates = [];
+    // Consider both absolute path (as preview.php resolves) and relative path as used by api.php warmers
+    $absPath = $videoPath;
+    $relPath = rtrim((string)($clipsDirs[$dirIndex] ?? $clipsDirs[0]), '\\/') . DIRECTORY_SEPARATOR . $file;
+    // Normalize relPath to not include baseDir
+    if (strpos($relPath, $baseDir . DIRECTORY_SEPARATOR) === 0) {
+        $relPath = substr($relPath, strlen($baseDir . DIRECTORY_SEPARATOR));
+    }
+    foreach ([$absPath, $relPath] as $p) {
+        // Variant A: OS separator, original case
+        $np_os = str_replace(['\\', '/'], DIRECTORY_SEPARATOR, $p);
+        $candidates[] = sha1($np_os . '|' . $mtime);
+        $candidates[] = sha1($np_os . '|' . $mtime . '|preview');
+        // Variant B: OS separator, lowercase on Windows
+        $np_os_lower = (stripos(PHP_OS, 'WIN') === 0) ? strtolower($np_os) : $np_os;
+        $candidates[] = sha1($np_os_lower . '|' . $mtime);
+        $candidates[] = sha1($np_os_lower . '|' . $mtime . '|preview');
+        // Variant C: Forward slashes, original case
+        $np_fwd = str_replace(['\\', '/'], '/', $p);
+        $candidates[] = sha1($np_fwd . '|' . $mtime);
+        $candidates[] = sha1($np_fwd . '|' . $mtime . '|preview');
+        // Variant D: Forward slashes, lowercase on Windows
+        $np_fwd_lower = (stripos(PHP_OS, 'WIN') === 0) ? strtolower($np_fwd) : $np_fwd;
+        $candidates[] = sha1($np_fwd_lower . '|' . $mtime);
+        $candidates[] = sha1($np_fwd_lower . '|' . $mtime . '|preview');
+    }
+
+    $previewPath = null;
+    foreach ($candidates as $h) {
+        $p = $baseDir . '/data/previews/' . $h . '.mp4';
+        if (file_exists($p)) { $previewPath = $p; break; }
+    }
+    if (!$previewPath) {
+        // Default to first candidate path (helps return a consistent path in error logs)
+        $previewPath = $baseDir . '/data/previews/' . ($candidates[0] ?? '') . '.mp4';
+    }
 }
 
 // Check if preview file exists

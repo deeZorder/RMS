@@ -1,9 +1,0 @@
-{
-  "name": "rms/app",
-  "description": "RMS project autoload (admin classmap)",
-  "type": "project",
-  "require": {},
-  "autoload": {
-    "classmap": ["admin/"]
-  }
-}
