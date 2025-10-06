@@ -1,254 +1,145 @@
 # Relax Media System (RMS)
 
-A professional multi-page PHP/HTML/JS/CSS multimedia system designed for comfort rooms and digital signage. This system provides an intuitive interface for managing and playing video collections of any size, from small personal libraries to massive collections of 30,000+ videos.
+RMS is a lightweight PHP/HTML/JS system for curated video playback in comfort rooms and digital signage. It provides a tablet‑friendly dashboard for selecting content, a TV/browser “screen” for playback, and an admin panel for configuration and bulk tasks.
 
-## Core Components
+## Overview
 
-### 🎮 Dashboard (dashboard.php)
-- **Responsive carousel interface** with drag-and-drop navigation
-- **Lazy-loaded thumbnails** for optimal performance with large collections
-- **Smart loading queue** (3 videos at a time) to prevent browser overload
-- **Touch-friendly controls** with momentum scrolling
-- **Real-time video controls**: Play, Pause, Stop, Loop, Play All
-- **Custom video titles** displayed instead of filenames
-- **Visual progress indicator** for loading large collections (10+ videos)
+- Dashboard: browsable carousel with play/pause/stop, Loop, and Play‑All controls
+- Screen: fullscreen player that syncs with dashboard state and advances on Play‑All
+- Admin: directory selection, titles, previews/thumbnails, refresh actions, and profiles
 
-### 📺 Screen (screen.php) 
-- **Auto-fullscreen playback** optimized for TV browsers and digital signage
-- **Aggressive fullscreen detection** with multiple browser API support
-- **Automatic video cycling** with "Play All" mode
-- **Cross-platform video serving** through secure PHP endpoint
-- **Real-time state synchronization** with dashboard controls
-- **Controls hidden by default** (no native UI). To show controls on a specific screen, open `screen.php?controls=1`. To force-hide, use `?nocontrols=1`.
+## Core Apps
 
-### ⚙️ Admin (admin.php)
-- **System-wide directory browsing** - select folders from any location/drive
-- **Pagination system** handles massive video collections (30,000+ videos)
-- **Custom video title management** with thumbnail previews
-- **Visual carousel preview** with balanced video distribution across rows
-- **Interactive video management** - edit titles and reorder videos in dashboard layout
-- **Responsive design** optimized for mobile, tablet, and desktop
-- **Toggle controls** for video thumbnails and information density
-- **Automatic dashboard refresh on save** for multi-device setups
-- **System Actions**: "Refresh Dashboards" and "Clear Thumbnails & Titles" buttons
-- **Thumbnail warm-up**: pre-generates thumbs in batches after scans/changes
+### Dashboard (`dashboard.php`)
+- Responsive, touch‑friendly carousel with lazy thumbnails and balanced rows
+- Playback controls: Play, Pause, Stop, Loop, Play All
+- Auto refresh when admin makes changes (via refresh signal)
 
-## Advanced Features
+### Screen (`screen.php`)
+- Fullscreen playback for TV/monitor browsers (controls hidden by default)
+- Honors Loop and Play‑All on end; uses next‑video ordering from saved profile
+- Resilient autoplay logic and ARIA fixes for built‑in video menus
 
-### 📊 Performance Optimizations
-- **Pagination**: Loads 50 videos per page instead of entire collection
-- **Lazy Loading**: Videos load only when visible in viewport
-- **Debounced Loading**: Prevents browser overload with large collections
-- **Smart Caching**: Efficient memory usage regardless of collection size
-- **Progress Tracking**: Visual indicators for loading status
+### Admin (`admin.php`)
+- Configure directories and profiles; manage titles and order
+- System Actions: Refresh Dashboards, Refresh Screens, generate thumbnails/previews
+- Per‑profile “Refresh Screen” buttons in Screen Management
 
-### 🎛️ Enhanced Controls
-- **Loop Mode**: Individual video repeat functionality
-- **Play All Mode**: Automatic playlist cycling through entire collection
-- **Smart Loop Logic**: When both modes enabled, cycles through all videos then loops
-- **Drag Navigation**: Mouse and touch support for carousel scrolling
-- **Momentum Scrolling**: Natural feel drag interactions
+## Architecture
 
-### 🌐 Cross-Platform Compatibility
-- **Windows Path Support**: Handles backslashes and drive letters correctly
-- **Flexible Directory Selection**: Browse any system location, not just project folders
-- **Universal Video Serving**: Secure PHP endpoint serves videos from any directory
-- **Mobile Responsive**: Touch-optimized interface for all device sizes
-
-### 🔄 Real-Time Communication
-- **Multi-Device Sync**: Dashboard auto-refreshes when you save changes in Admin
-- **Live State Updates**: Real-time playback state synchronization
-- **Persistent Settings**: All configurations saved and restored automatically
-- **Balanced Distribution**: Videos automatically spread evenly across dashboard rows
-- **Visual Layout Matching**: Admin carousel preview accurately reflects dashboard layout
-
-## 🚀 Quick Start
-
-### Installation
-1. **Extract** the `RMS` folder to your LAMP/XAMPP `htdocs` directory
-2. **Start** your web server (Apache + PHP)
-3. **Navigate** to the admin page to configure your video directory
-
-### URLs
-- **Dashboard**: `http://localhost/RMS/dashboard.php` - Video selection interface
-- **Screen**: `http://localhost/RMS/screen.php` - Fullscreen player for TV/monitor (controls hidden by default)
-- **Admin**: `http://localhost/RMS/admin.php` - Configuration and management
-
-### Basic Setup
-1. **Open Admin Page**: Configure your video directory location
-2. **Browse Directories**: Select any folder on your system (local drives, network drives)
-3. **Customize Titles**: Edit video display names and toggle thumbnail visibility
-4. **Test Dashboard**: Verify videos load and playback controls work
-5. **Setup Screen**: Open on secondary display for fullscreen playback
-
-## 💡 Usage Tips
-
-### For Large Collections (1000+ videos)
-- **Pagination automatically activates** for collections over 50 videos
-- **Use page navigation** or "Jump to page" for quick browsing
-- **Toggle thumbnails off** in admin for faster loading when editing titles
-- **Search functionality** works across all paginated results
-
-### Multi-Device Setup
-1. **Admin Device**: Laptop/tablet running `admin.php` for control
-2. **Selection Device**: Touch display running `dashboard.php` for user interaction
-3. **Playback Device**: TV/monitor running `screen.php` for fullscreen viewing
-4. **Sync**: The dashboard updates automatically within ~3 seconds after you save changes in Admin
-
-### Supported Video Formats
-- **Primary**: MP4, WebM, OGG, MOV
-- **Extended**: AVI, MKV (browser dependent)
-- **Optimization**: H.264 MP4 recommended for best compatibility
+- State: `data/profiles/<profile>/state.json` (current video, playback, modes, refresh flags)
+- Order: `data/profiles/<profile>/video_order.json` (dirPath|filename list)
+- API: `api.php` provides a unified set of endpoints. Router class `APIRouter.php` and `handlers/` support a modular path as well.
+- Refresh: Admin sets `refreshRequested=true` with a recent `lastRefreshTrigger`. Dashboard/screen poll `api.php?action=check_refresh_signal` and auto‑reload when set. Legacy `dashboard_refresh.txt` files are still supported.
 
 ## 📁 File Structure
 
-```
+```text
 RMS/
-├── dashboard.php             # Video selection carousel interface
-├── screen.php                # Fullscreen video player (controls hidden by default)
-├── admin.php                 # Configuration and management panel
-├── api.php                   # REST endpoints for inter-page communication
-├── video.php                 # Secure video file serving endpoint
-├── thumb.php                 # On-demand thumbnail generation/serving
-├── header.php                # Shared navigation component
+├── admin/                          # Admin UI (PHP + JS)
+│   ├── Admin.php                   # Admin page renderer and sections
+│   ├── AdminBootstrap.php          # Bootstraps the admin system
+│   ├── AdminConfig.php             # Reads/writes config, dashboards, screens
+│   ├── AdminHandlers.php           # Processes admin POST actions
+│   ├── AdminTemplate.php           # Shared admin HTML/CSS template helpers
+│   └── admin.js                    # Admin client-side logic (navigation, modals)
+│
+├── handlers/                       # API handler classes (modular routing)
+│   ├── BaseHandler.php             # Base class shared by handlers
+│   ├── SystemHandler.php           # Health, state, refresh-signal checks
+│   ├── VideoControlHandler.php     # Play/Pause/Stop, volume, loop/play-all
+│   ├── VideoManagementHandler.php  # Current/next video selection
+│   ├── VideoLibraryHandler.php     # Listing, titles, moves
+│   ├── AdminHandler.php            # Admin batch ops (warming, browse)
+│   └── BatchHandler.php            # Batched state queries for UI
+│
 ├── assets/
-│   └── style.css             # Responsive UI styling
-├── data/
-│   ├── admin_cache.json      # Admin-side scan cache
-│   ├── video_titles.json     # Custom video title mappings
-│   ├── thumbs/               # Generated thumbnails cache
+│   └── style.css                   # Shared styling for dashboard/admin
+│
+├── data/                           # Persistent app data and caches
+│   ├── admin_cache.json            # Admin scan cache (directories/videos)
+│   ├── dashboards.json             # Dashboard profiles (rows, clipsPerRow, bg)
+│   ├── screens.json                # Registered screens with profile mapping
 │   ├── profiles/
-│   │   └── default/
-│   │       ├── current_video.txt
-│   │       ├── playback_state.txt
-│   │       ├── volume.txt
-│   │       ├── mute_state.txt
-│   │       ├── loop_mode.txt
-│   │       ├── play_all_mode.txt
-│   │       ├── dashboard_refresh.txt
-│   │       └── video_order.json
-│   ├── screens.json          # Screens registry
-│   └── dashboards.json       # Dashboard profiles
-└── config.json               # Base configuration storage
+│   │   └── <profile>/              # Per-profile state and order
+│   │       ├── state.json          # Live state (currentVideo, playback, flags)
+│   │       ├── video_order.json    # Saved order (dirPath|filename array)
+│   │       ├── titles.json         # Optional per-profile custom titles
+│   │       └── dashboard.log       # Optional diagnostics
+│   ├── thumbs/                     # Generated thumbnail JPEGs (hashed)
+│   └── previews/                   # Generated preview MP4s (hashed)
+│
+├── videos/                         # Your video directories (configurable)
+│
+├── .htaccess                       # Cache headers (static vs dynamic), gzip
+├── APIRouter.php                   # Routes api.php actions to handlers
+├── admin.php                       # Admin entry point (loads Admin class)
+├── api.php                         # Unified API (legacy + new endpoints)
+├── dashboard.php                   # Video selection carousel interface
+├── header.php                      # Shared header included by admin
+├── index.php                       # Optional redirect/landing
+├── preview.php                     # Preview serving (generated clips)
+├── screen.php                      # Fullscreen player (TV/monitor)
+├── state_direct.php                # Direct state JSON endpoint (fallback)
+├── state_manager.php               # State helpers (load/save/update)
+├── thumb.php                       # On-demand thumbnail generation/serve
+├── video.php                       # Secure video file serving endpoint
+└── config.json                     # Base configuration
 ```
 
-## 🔧 Technical Features
+## Installation
 
-### Performance Optimizations
-- **Lazy Loading**: Videos load only when visible
-- **Pagination**: Handles collections of any size (tested with 30,000+ videos)
-- **Smart Caching**: Minimal memory footprint regardless of collection size
-- **Debounced Loading**: Prevents browser overload with batch processing
+1. Copy `RMS/` into your web root (e.g., `htdocs`) and start Apache/PHP
+2. Open Admin and select your video directory/directories
+3. Optionally generate thumbnails/previews via System Actions
 
-### Browser Compatibility
-- **Desktop**: Chrome, Firefox, Safari, Edge
-- **Mobile**: iOS Safari, Chrome Mobile, Samsung Internet
-- **TV Browsers**: Optimized for digital signage and embedded browsers
-- **Fullscreen**: Multiple API support for maximum compatibility
+URLs:
+- Admin: `http://localhost/RMS/admin.php`
+- Dashboard: `http://localhost/RMS/dashboard.php`
+- Screen: `http://localhost/RMS/screen.php` (use `?controls=1` to show controls)
 
-### Security Features
-- **Path Validation**: Prevents directory traversal attacks
-- **File Type Filtering**: Only serves approved video formats
-- **Secure Endpoints**: All file access through validated PHP endpoints
-- **Input Sanitization**: All user inputs properly escaped and validated
+## Usage
 
-### Headers & Encoding
-- **JSON APIs** return `Content-Type: application/json; charset=utf-8` for correctness
-- **Static assets** (CSS/JS/JSON) are served with UTF‑8 via `.htaccess`
-- **CSS** declares `@charset "UTF-8"` as the first line
+- From the dashboard, select and play videos; toggle Loop/Play‑All as needed
+- On the screen, videos loop or advance automatically based on modes
+- Use Admin → System Actions to “Refresh Dashboards” or “Refresh Screens” after changes
+- Use Admin → Screen Management → “Refresh Screen” to target a single profile
 
-## ⚠️ System Requirements & Compatibility
+## API (quick reference)
 
-### PHP Version Requirements
-- **Minimum**: PHP 7.3 (tested and compatible)
-- **Recommended**: PHP 7.4+ for optimal performance
-- **Important**: The API was refactored in v2.3 to use modern handler architecture while maintaining PHP 7.3 compatibility
+- Read: `get_current_video`, `get_playback_state`, `get_loop_mode`, `get_play_all_mode`, `get_next_video`
+- Write: `set_current_video`, `play_video`, `pause_video`, `stop_video`, `set_loop_mode`, `set_play_all_mode`
+- System: `check_refresh_signal`, `check_config_changes`
 
-### Critical Compatibility Notes
-- **PHP 7.3 Servers**: If you experience "syntax error, unexpected 'string'" in APIRouter.php, ensure typed properties have been removed (fixed in v2.3+)
-- **API Endpoint Issues**: "Failed to load directories" or empty API responses typically indicate PHP version compatibility problems
-- **Handler Architecture**: The new modular API system is fully backward compatible with PHP 7.3
+## Caching & Headers
 
-### Server Configuration
-- **Web Server**: Apache 2.4+ or Nginx 1.18+
-- **PHP Extensions**: Standard (no additional extensions required)
-- **File Permissions**: PHP must have read access to video directories
-- **Optional**: FFmpeg for thumbnail generation (not required for basic functionality)
+- Dynamic pages: `Cache-Control: no-store, no-cache, must-revalidate` (avoid stale UI)
+- Static assets: long‑lived cache via `.htaccess`
+- Consider self‑hosting third‑party libraries if you need local cache headers
 
-## 🆘 Troubleshooting
+## Accessibility
 
-### Performance Issues
-- **Slow Loading**: Enable pagination in admin (automatic for 50+ videos)
-- **Memory Usage**: Toggle off thumbnails for large collections
-- **Browser Freezing**: Reduce videos per page in API settings
+- Video.js menus receive ARIA roles at runtime on `screen.php` to satisfy validators
+- Screen controls are hidden by default for signage; enable per device with `?controls=1`
 
-### Playback Issues
-- **No Fullscreen**: Check browser permissions and TV compatibility mode
-- **Videos Not Playing**: Verify file formats and video.php endpoint accessibility
-- **Sync Problems**: Ensure the server can write `dashboard_refresh.txt` and that `dashboard.php` is open (it polls every 3s)
- - **Thumbnails Not Generating**: Ensure `ffmpeg` is installed and available in PATH. Use Admin → System Actions → "Clear Thumbnails & Titles", then re-add or rescan directories to warm thumbnails.
+## Troubleshooting
 
-### Directory Issues
-- **"Failed to load directories"**: Check PHP version compatibility (see System Requirements above)
-- **Can't Browse**: Ensure PHP has read permissions for target directories
-- **Path Errors**: Use the directory browser instead of manual path entry
-- **Network Drives**: Map drives before selection or use UNC paths
+- JSON parse errors in console: ensure endpoints return clean JSON (no BOM, no stray `?>`); visit the endpoint URL directly to verify
+- “Next video” not advancing: confirm Play‑All is on and `get_next_video` returns a result; verify `video_order.json` exists for the profile
+- Thumbnails not showing: ensure FFmpeg is installed and accessible; re‑generate via Admin
+- Icons appear garbled: server/editor encoding—Admin normalizes key labels at runtime; ensure UTF‑8 everywhere
 
-### API & Handler Issues
-- **Empty API responses**: Likely PHP syntax error due to version incompatibility
-- **500 Internal Server Error**: Enable `display_errors = 1` in api.php temporarily to see actual error
-- **Missing endpoints**: Ensure all 5 legacy endpoints are present in APIRouter (fixed in v2.3+)
-- **Handler not found**: Verify all handler files exist and are properly included
+## Requirements
 
-## 🔄 Recent Updates
+- PHP 7.3+ (7.4+ recommended), Apache 2.4+
+- File read permission for video directories; write permission for `data/`
+- Optional FFmpeg for thumbnails and previews
 
-### v2.4 - Enhanced Admin Panel & Balanced Distribution
-- **Visual carousel preview**: Admin panel now shows accurate dashboard layout preview
-- **Balanced video distribution**: Videos spread evenly across all dashboard rows instead of sequential filling
-- **Interactive video management**: Edit titles and reorder videos directly in carousel preview
-- **Improved error handling**: Enhanced API error detection and graceful fallbacks
-- **Admin panel refinements**: Removed list view, simplified interface focused on carousel
-- **Real-time layout sync**: Admin preview matches dashboard layout exactly
+## Recent Updates (highlights)
 
-### v2.3 - API Refactor & PHP 7.3 Compatibility
-- **Modular handler architecture**: Split monolithic API into specialized handlers
-- **PHP 7.3 compatibility**: Removed typed properties for broader server support
-- **Missing endpoints restored**: Re-added 5 critical legacy endpoints (`check_mute_signal`, `check_volume_signal`, `check_refresh_signal`, `trigger_dashboard_refresh`, `force_refresh_videos`)
-- **Directory browser fixes**: Resolved "Failed to load directories" issues
-- **Real-time synchronization**: Restored signal-based communication between devices
-- **Distributed setup support**: Fixed multi-device coordination (tablet, monitor, server)
+- Unified refresh via state flags; legacy file fallback
+- Per‑profile refresh buttons and global screen refresh
+- Loop/Play‑All respected by `screen.php` on video end
+- Added `get_next_video`; hardened `check_refresh_signal`
+- Fixed JSON issues (removed BOM/stray tag); added cache headers and `.htaccess`
 
-### v2.2 - System Actions & Screen Controls
-- Default screen controls hidden; enable per screen with `?controls=1`
-- Added System Actions: "Refresh Dashboards" and "Clear Thumbnails & Titles"
-- Thumbnail warm-up improved to use latest config; admin cache invalidated on clear
-
-### v2.1 - Admin & Headers
-- **Auto dashboard refresh on save** (no manual button needed)
-- **Session-based flash messages** next to Save buttons; removed `refreshed=1` query param
-- **Externalized inline styles** into `assets/style.css`
-- **UTF‑8 everywhere**: JSON APIs send `charset=utf-8`; CSS declares `@charset`; `.htaccess` sets UTF‑8 for static assets
-
-### v2.0 - Performance & Scale
-- **Pagination system** for massive video collections
-- **Lazy loading** with visual progress indicators
-- **Mobile-responsive admin interface**
-- **Drag navigation** for carousel scrolling
-
-### v1.5 - Enhanced Controls
-- **Play All mode** with smart loop integration
-- **Custom video titles** with thumbnail previews
-- **Multi-device dashboard refresh**
-- **Universal directory browsing**
-
-### v1.0 - Core Features
-- **Responsive carousel interface**
-- **Automatic fullscreen playback**
-- **Real-time control synchronization**
-- **Cross-platform compatibility**
-
----
-
-**System Requirements**: PHP 7.3+, Apache/Nginx, Modern web browser  
-**Tested Collections**: Up to 30,000 videos  
-**Performance**: Sub-2 second load times on standard hardware

@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 
 require_once __DIR__ . '/BaseHandler.php';
 
@@ -187,7 +187,7 @@ class VideoControlHandler extends BaseHandler {
         $loopMode = $_POST['loop'] === 'on' ? 'on' : 'off';
         updateState($this->profileId, ['loopMode' => $loopMode]);
         
-        echo json_encode(['status' => 'ok', 'loop' => $loopMode]);
+        echo json_encode(['status' => 'ok', 'loopMode' => $loopMode]);
     }
     
     private function getLoopMode(): void {
@@ -198,7 +198,7 @@ class VideoControlHandler extends BaseHandler {
         }
         
         $state = loadState($this->profileId);
-        echo json_encode(['loop' => $state['loopMode']]);
+        echo json_encode(['loopMode' => $state['loopMode']]);
     }
     
     private function setPlayAllMode(): void {
@@ -210,10 +210,10 @@ class VideoControlHandler extends BaseHandler {
             return;
         }
         
-        $playAllMode = $_POST['play_all'] === 'on' ? 'on' : 'off';
+        $playAllMode = $_POST['playAllMode'] === 'on' ? 'on' : 'off';
         updateState($this->profileId, ['playAllMode' => $playAllMode]);
         
-        echo json_encode(['status' => 'ok', 'play_all' => $playAllMode]);
+        echo json_encode(['status' => 'ok', 'playAllMode' => $playAllMode]);
     }
     
     private function getPlayAllMode(): void {
@@ -224,7 +224,7 @@ class VideoControlHandler extends BaseHandler {
         }
         
         $state = loadState($this->profileId);
-        echo json_encode(['play_all' => $state['playAllMode']]);
+        echo json_encode(['playAllMode' => $state['playAllMode']]);
     }
     
     private function setExternalAudioMode(): void {

@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 
 require_once __DIR__ . '/BaseHandler.php';
 
@@ -88,6 +88,13 @@ class AdminHandler extends BaseHandler {
         $end = min($total, $offset + $batch);
         $processed = 0;
         $failed = 0;
+
+        // Cache ffmpeg availability once per request
+        $which = (stripos(PHP_OS, 'WIN') === 0) ? 'where' : 'which';
+        $cmdCheck = $which . ' ffmpeg' . (stripos(PHP_OS, 'WIN') === 0 ? ' 2> NUL' : ' 2> /dev/null');
+        @exec($cmdCheck, $__out, $__code);
+        $ffmpegAvailable = ($__code === 0);
+
         
         for ($i = $offset; $i < $end; $i++) {
             $entry = $targets[$i];
@@ -111,12 +118,8 @@ class AdminHandler extends BaseHandler {
                 $thumbPath = rtrim($thumbDir, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . $hash . '.jpg';
                 
                 if (!is_file($thumbPath)) {
-                    // Check ffmpeg availability
-                    $which = (stripos(PHP_OS, 'WIN') === 0) ? 'where' : 'which';
-                    $cmdCheck = $which . ' ffmpeg' . (stripos(PHP_OS, 'WIN') === 0 ? ' 2> NUL' : ' 2> /dev/null');
-                    @exec($cmdCheck, $out, $code);
-                    
-                    if ($code === 0) {
+                    // Use cached ffmpeg availability
+                    if () {
                         $escapedIn = escapeshellarg($videoPath);
                         $escapedOut = escapeshellarg($thumbPath);
                         $cmd = 'ffmpeg -ss 1 -i ' . $escapedIn . ' -frames:v 1 -vf "scale=480:-1" -q:v 5 -y ' . $escapedOut . (stripos(PHP_OS, 'WIN') === 0 ? ' 2> NUL' : ' 2> /dev/null');
@@ -209,6 +212,13 @@ class AdminHandler extends BaseHandler {
         $end = min($total, $offset + $batch);
         $processed = 0;
         $failed = 0;
+
+        // Cache ffmpeg availability once per request
+        $which = (stripos(PHP_OS, 'WIN') === 0) ? 'where' : 'which';
+        $cmdCheck = $which . ' ffmpeg' . (stripos(PHP_OS, 'WIN') === 0 ? ' 2> NUL' : ' 2> /dev/null');
+        @exec($cmdCheck, $__out2, $__code2);
+        $ffmpegAvailable2 = ($__code2 === 0);
+
         
         for ($i = $offset; $i < $end; $i++) {
             $entry = $targets[$i];
@@ -236,12 +246,8 @@ class AdminHandler extends BaseHandler {
                     // Ensure admin cache has preview metadata
                     $this->updateAdminCachePreviewMetadata($all[$i], $hash, $mtime);
                 } else {
-                    // Check ffmpeg availability
-                    $which = (stripos(PHP_OS, 'WIN') === 0) ? 'where' : 'which';
-                    $cmdCheck = $which . ' ffmpeg' . (stripos(PHP_OS, 'WIN') === 0 ? ' 2> NUL' : ' 2> /dev/null');
-                    @exec($cmdCheck, $out, $code);
-                    
-                    if ($code === 0) {
+                    // Use cached ffmpeg availability
+                    if () {
                         $escapedIn = escapeshellarg($videoPath);
                         $escapedOut = escapeshellarg($previewPath);
                         

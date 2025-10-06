@@ -38,6 +38,24 @@ document.addEventListener('DOMContentLoaded', function() {
                 .finally(function(){ btn.disabled = false; btn.textContent = old; });
         });
     })();
+
+    // Initialize thumbnail reindex button
+    (function(){
+        var btn = document.getElementById('reindex-thumbs-btn');
+        if (!btn) return;
+        btn.addEventListener('click', function(){
+            var old = btn.textContent;
+            btn.disabled = true; btn.textContent = 'Reindexing…';
+            fetch('api.php?action=reindex_thumbs')
+                .then(function(r){ return r.json(); })
+                .then(function(d){
+                    alert('Thumb reindex complete. Mapped: ' + (d.mapped || 0) + ' / ' + (d.total || 0) + (d.updated ? (' (updated '+d.updated+')') : ''));
+                    location.reload();
+                })
+                .catch(function(){ alert('Thumb reindex failed'); })
+                .finally(function(){ btn.disabled = false; btn.textContent = old; });
+        });
+    })();
     
     // Initialize with URL parameters or default section
     var urlParams = new URLSearchParams(window.location.search);
@@ -582,6 +600,11 @@ function initializeVideoManagement() {
                 .catch(function(){ /* ignore */ });
         });
     });
+    // Ensure the label says "Refresh Dashboards" (not "Refresh Screens")
+    var refreshBtn = document.querySelector('#video-management .header-actions button[type="submit"]');
+    if (refreshBtn) {
+        refreshBtn.textContent = 'Refresh Dashboards';
+    }
 }
 
 function loadVideoTitles() {
@@ -1763,3 +1786,56 @@ function checkRunningProcesses() {
         stopProcessesBtn.className = 'btn btn-secondary';
     }
 }
+    // Normalize icons/text in System Actions (avoid mojibake by using entities)
+    (function normalizeSystemActionIcons(){
+        function setHTML(selector, html){ var el=document.querySelector(selector); if (el) { el.innerHTML = html; } }
+        // System Actions card header (anchor via a known child button)
+        try {
+            // System Status section title
+            var sysStatusTitle = document.querySelector('#system-status .section-header h3');
+            if (sysStatusTitle) { sysStatusTitle.innerHTML = '&#129517; System Status'; }
+
+            // Directory Status (first status card under System Status)
+            var dirStatusH4 = document.querySelector('#system-status .status-cards .status-card h4');
+            if (dirStatusH4) { dirStatusH4.innerHTML = '&#128193; Directory Status'; }
+
+            var thumbsBtn = document.getElementById('generate-thumbs-btn');
+            if (thumbsBtn) {
+                var sysCard = thumbsBtn.closest('.status-card');
+                if (sysCard) {
+                    var h4 = sysCard.querySelector('h4');
+                    if (h4) h4.innerHTML = '&#9881;&#65039; System Actions';
+                }
+            }
+            // Dashboard Video Controls header
+            var dvc = document.getElementById('dashboard-video-controls');
+            if (dvc) {
+                var dvcCard = dvc.closest('.status-card');
+                if (dvcCard) {
+                    var h4b = dvcCard.querySelector('h4');
+                    if (h4b) h4b.innerHTML = '&#127899;&#65039; Dashboard Video Controls';
+                }
+            }
+            // Buttons inside System Actions
+            setHTML('#generate-thumbs-btn', '&#128444;&#65039; Generate Thumbnails');
+            setHTML('#generate-previews-btn', '&#127916; Generate Previews');
+            setHTML('#stop-processes-btn', '&#9209;&#65039; Stop All Processes');
+            setHTML('#reindex-previews-btn', '&#8635; Reindex Previews');
+            // Hidden-field anchored buttons
+            var refreshDashBtnInput = document.querySelector('input[name="current_section"][value="system-refresh"]');
+            if (refreshDashBtnInput) {
+                var btn1 = refreshDashBtnInput.closest('form')?.querySelector('button');
+                if (btn1) btn1.innerHTML = '&#128257; Refresh Dashboards';
+            }
+            var clearBtnInput = document.querySelector('input[name="current_section"][value="clear-thumbs-titles"]');
+            if (clearBtnInput) {
+                var btn2 = clearBtnInput.closest('form')?.querySelector('button');
+                if (btn2) btn2.innerHTML = '&#129531; Clear Titles, Thumbnails &amp; Previews';
+            }
+            var resetBtnInput = document.querySelector('input[name="current_section"][value="system-reset"]');
+            if (resetBtnInput) {
+                var btn3 = resetBtnInput.closest('form')?.querySelector('button');
+                if (btn3) btn3.innerHTML = '&#128260; Reset to Default';
+            }
+        } catch(_) {}
+    })();

@@ -1,4 +1,4 @@
-<?php
+﻿﻿﻿<?php
 // dashboard.php
 // User interface to browse and select videos for playback.
 
@@ -25,7 +25,7 @@ if (file_exists($configPath)) {
 }
 
 // Optional: load dashboard profile overrides
-// Support short param: d=0 → default, d=1 → dashboard1; otherwise ?dashboard=dashboardId; default → 'default'
+// Support short param: d=0 â†’ default, d=1 â†’ dashboard1; otherwise ?dashboard=dashboardId; default â†’ 'default'
 $selectedDashboardId = 'default';
 $d = isset($_GET['d']) ? $_GET['d'] : null;
 if (isset($_GET['d'])) {
@@ -441,8 +441,8 @@ if ($dashboardBg !== '') {
         
         <?php if ($currentVideoUpdate): ?>
         <div id="auto-update-notification" style="background: #4ecdc4; color: white; padding: 10px; border-radius: 5px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;">
-            <span>✅ Video list automatically updated! Current video set to: <?php echo htmlspecialchars($currentVideoUpdate['filename']); ?></span>
-            <button onclick="document.getElementById('auto-update-notification').style.display='none'" style="background: none; border: none; color: white; font-size: 18px; cursor: pointer;">×</button>
+            <span>Video list automatically updated! Current video set to: <?php echo htmlspecialchars($currentVideoUpdate['filename']); ?></span>
+            <button onclick="document.getElementById('auto-update-notification').style.display='none'" style="background: none; border: none; color: white; font-size: 18px; cursor: pointer;"><img class="icon" src="assets/svgs/close.svg" alt="Close" /></button>
         </div>
         <?php endif; ?>
         <?php if (empty($videoFiles)): ?>
@@ -464,7 +464,7 @@ if ($dashboardBg !== '') {
             ?>
             <?php foreach ($rowsData as $rowIndex => $videos): ?>
                 <div class="carousel-row" data-row-index="<?php echo $rowIndex; ?>">
-                    <button class="arrow prev" aria-label="Scroll left">&#x2039;</button>
+                    <button class="arrow prev" aria-label="Scroll left"><img class="icon" src="assets/svgs/chevron-left.svg" alt="" aria-hidden="true"></button>
                     <div class="carousel-track" data-row="<?php echo $rowIndex; ?>">
                         <?php foreach ($videos as $video): 
                             // Calculate style for width per item with reduced gap
@@ -493,13 +493,13 @@ if ($dashboardBg !== '') {
                             <div class="carousel-item" data-filename="<?php echo htmlspecialchars($video['name'], ENT_QUOTES, 'UTF-8'); ?>" data-dir-index="<?php echo (int)$video['dirIndex']; ?>" style="flex: 0 0 <?php echo $calcWidth; ?>;">
                                 <img data-src="<?php echo htmlspecialchars($thumbSrc, ENT_QUOTES, 'UTF-8'); ?>" alt="thumbnail" class="lazy-thumb" loading="lazy" />
                                 <div class="video-placeholder">
-                                    <div class="play-icon">▶</div>
+                                    <div class="play-icon"><img class="overlay-play-icon" src="assets/svgs/play.svg" alt=""></div>
                                 </div>
                                 <div class="title" data-filename="<?php echo htmlspecialchars($video['name'], ENT_QUOTES, 'UTF-8'); ?>" data-dir-index="<?php echo (int)$video['dirIndex']; ?>"><?php echo htmlspecialchars(pathinfo($video['name'], PATHINFO_FILENAME), ENT_QUOTES, 'UTF-8'); ?></div>
                             </div>
                         <?php endforeach; ?>
                     </div>
-                    <button class="arrow next" aria-label="Scroll right">&#x203a;</button>
+                    <button class="arrow next" aria-label="Scroll right"><img class="icon" src="assets/svgs/chevron-right.svg" alt="" aria-hidden="true"></button>
                 </div>
             <?php endforeach; ?>
         <?php endif; ?>
@@ -509,20 +509,20 @@ if ($dashboardBg !== '') {
             <h3></h3>
             <div class="control-row">
                 <div class="control-buttons">
-                    <button type="button" id="play-btn" class="btn primary">▶ Play</button>
-                    <button type="button" id="pause-btn" class="btn secondary">⏸ Pause</button>
-                    <button type="button" id="stop-btn" class="btn secondary">⏹ Stop</button>
+                    <button type="button" id="play-btn" class="btn primary"><img class="icon" src="assets/svgs/play.svg" alt="" aria-hidden="true"><span class="label">Play</span></button>
+                    <button type="button" id="pause-btn" class="btn secondary"><img class="icon" src="assets/svgs/pause.svg" alt="" aria-hidden="true"><span class="label">Pause</span></button>
+                    <button type="button" id="stop-btn" class="btn secondary"><img class="icon" src="assets/svgs/stop.svg" alt="" aria-hidden="true"><span class="label">Stop</span></button>
                 </div>
                 <div class="playback-controls">
-                    <button type="button" id="loop-btn" class="btn secondary">🔁 Loop</button>
-                    <button type="button" id="all-btn" class="btn secondary">📺 Play All</button>
-                    <button type="button" id="external-audio-btn" class="btn secondary" title="Use phone or external device for audio" style="display: none;">🔈 External Audio</button>
+                    <button type="button" id="loop-btn" class="btn secondary"><img class="icon" src="assets/svgs/loop.svg" alt="" aria-hidden="true"><span class="label">Loop</span></button>
+                    <button type="button" id="all-btn" class="btn secondary"><img class="icon" src="assets/svgs/play-all.svg" alt="" aria-hidden="true"><span class="label">Play All</span></button>
+                    <button type="button" id="external-audio-btn" class="btn secondary" title="Use phone or external device for audio" style="display: none;"><img class="icon" src="assets/svgs/external-audio.svg" alt="" aria-hidden="true"><span class="label">External Audio</span></button>
                 </div>
             </div>
             <div class="volume-control">
                 <div class="volume-header">
                     <label for="volume-slider">Volume: <span id="volume-display">100%</span></label>
-                    <button type="button" id="mute-btn" class="btn secondary">🔊</button>
+                    <button type="button" id="mute-btn" class="btn secondary"><img class="icon" src="assets/svgs/volume-on.svg" alt="" aria-hidden="true"><span class="label">Mute</span></button>
                 </div>
                 <input type="range" id="volume-slider" min="0" max="100" value="100" step="5">
             </div>
@@ -704,7 +704,7 @@ if ($dashboardBg !== '') {
         let configCheckErrorCount = 0;
         function checkConfigForChanges() {
             fetch('api.php?action=check_config_changes&' + profileQuery + '&t=' + Date.now(), {
-                signal: AbortSignal.timeout(5000) // 5 second timeout
+                signal: (window.AbortSignal && AbortSignal.timeout ? AbortSignal.timeout(5000) : undefined) // 5 second timeout
             })
                 .then(response => {
                     if (!response.ok) {
@@ -917,7 +917,7 @@ if ($dashboardBg !== '') {
         let isProcessingQueue = false;
         let totalVideos = document.querySelectorAll('.carousel-item').length;
         let loadedVideos = 0;
-        const thumbnailsDisabled = totalVideos > 60; // Disable thumbnails for large collections to speed up load
+		const thumbnailsDisabled = false; // Always enable thumbnails
         
         const updateLoadingProgress = () => {
             const indicator = document.getElementById('loading-indicator');
@@ -971,7 +971,7 @@ if ($dashboardBg !== '') {
                     const onError = () => {
                         carouselItem.classList.remove('loading');
                         const playIcon = carouselItem.querySelector('.play-icon');
-                        if (playIcon) playIcon.textContent = '❌';
+                        if (playIcon) playIcon.textContent = 'âŒ';
                         loadedVideos++;
                         updateLoadingProgress();
                         cleanup();
@@ -995,6 +995,13 @@ if ($dashboardBg !== '') {
         };
         
         if (!thumbnailsDisabled) {
+            if (!window.IntersectionObserver) {
+                // Fallback: eagerly load thumbnails when IntersectionObserver is unavailable
+                document.querySelectorAll('.carousel-item .lazy-thumb[data-src]').forEach(img => {
+                    img.src = img.getAttribute('data-src');
+                    img.removeAttribute('data-src');
+                });
+            } else {
             const videoObserver = new IntersectionObserver((entries) => {
                 entries.forEach(entry => {
                     if (entry.isIntersecting) {
@@ -1014,6 +1021,7 @@ if ($dashboardBg !== '') {
             document.querySelectorAll('.carousel-item').forEach(item => {
                 videoObserver.observe(item);
             });
+            }
         } else {
             // Indicate thumbnails are disabled to the user when collections are big
             const indicator = document.getElementById('loading-indicator');
@@ -1071,19 +1079,11 @@ if ($dashboardBg !== '') {
                     updateVideoControlsTitle(filename, dirIndex);
 
                     // Start playing the selected video automatically
-                    console.log('Starting video playback');
-                    const playForm = new FormData();
-                    playForm.append('profile', profileParam);
-                    fetch('api.php?action=play_video&' + profileQuery, { method: 'POST', body: playForm })
-                        .then(res => res.json())
-                        .then((playData) => {
-                            logDash('play_video_response', { ok: true, data: playData });
-                            console.log('Play video response:', playData);
-                            updateButtonStates('play');
-                        }).catch((error) => {
-                            logDash('play_video_error', { message: String(error) });
-                            console.error('Play video error:', error);
-                        });
+                     const playForm = new FormData();
+                     playForm.append('profile', profileParam);
+                     fetch('api.php?action=play_video&' + profileQuery, { method: 'POST', body: playForm })
+                         .then(res => res.json())
+                         .then(() => { updateButtonStates('play'); })
                 }).catch((error) => {
                     logDash('set_current_video_error', { message: String(error) });
                     console.error('Set current video error:', error);
@@ -1188,7 +1188,7 @@ if ($dashboardBg !== '') {
         let pollErrorCount = 0;
         function pollPlaybackState() {
             fetch('api.php?action=get_playback_state&' + profileQuery, {
-                signal: AbortSignal.timeout(5000) // 5 second timeout
+                signal: (window.AbortSignal && AbortSignal.timeout ? AbortSignal.timeout(5000) : undefined) // 5 second timeout
             })
                 .then(res => {
                     if (!res.ok) {
@@ -1200,6 +1200,15 @@ if ($dashboardBg !== '') {
                     pollErrorCount = 0; // Reset error count on success
                     updateButtonStates(data.state);
                     currentPlaybackState = data.state || 'stop';
+                    // Update current video info when state changes
+                    fetch('api.php?action=get_current_video&' + profileQuery)
+                        .then(r => r.json())
+                        .then(cd => {
+                            const cv = cd && cd.currentVideo;
+                            const nm = cv && typeof cv === 'object' ? (cv.filename || '') : '';
+                            const di = cv && typeof cv === 'object' ? (cv.dirIndex || 0) : 0;
+                            updateVideoControlsTitle(nm, di);
+                        }).catch(() => {});
                     if (Date.now() - lastUserSelection < 4000 && currentPlaybackState === 'stop') {
                         logDash('unexpected_stop_after_selection', { sinceSelectionMs: Date.now() - lastUserSelection });
                     }
@@ -1228,7 +1237,7 @@ if ($dashboardBg !== '') {
         let updateErrorCount = 0;
         function updateCurrentVideoDisplay() {
             fetch('api.php?action=get_current_video&' + profileQuery, {
-                signal: AbortSignal.timeout(5000) // 5 second timeout
+                signal: (window.AbortSignal && AbortSignal.timeout ? AbortSignal.timeout(5000) : undefined) // 5 second timeout
             })
                 .then(res => {
                     if (!res.ok) {
@@ -1304,11 +1313,11 @@ if ($dashboardBg !== '') {
                 let prefix = 'Stopped';
                 if (state === 'play') prefix = 'Playing';
                 else if (state === 'pause') prefix = 'Paused';
-                else if (state === 'stop' && hasSelected) prefix = 'Selected';
+                else if (state === 'stop' && hasSelected) prefix = 'Stopped';
                 document.getElementById('current-video-name').textContent = prefix + (displayTitle ? ': ' + displayTitle : '');
             }).catch(() => {
                 const fallback = filename ? filename.replace(/\.[^/.]+$/, '') : '';
-                document.getElementById('current-video-name').textContent = (fallback ? ('Selected: ' + fallback) : 'No video selected');
+                document.getElementById('current-video-name').textContent = (fallback ? ('Stopped: ' + fallback) : 'No video selected');
             });
         }
         
@@ -1360,7 +1369,10 @@ if ($dashboardBg !== '') {
         });
         
         function updateMuteButton(muted) {
-            muteBtn.textContent = muted ? '🔇' : '🔊';
+            const label = muteBtn.querySelector('.label');
+            const icon = muteBtn.querySelector('img.icon');
+            if (label) label.textContent = muted ? 'Unmute' : 'Mute';
+            if (icon) icon.src = muted ? 'assets/svgs/volume-off.svg' : 'assets/svgs/volume-on.svg';
             muteBtn.className = muted ? 'btn primary' : 'btn secondary';
             if (volumeControl) {
                 if (muted) {
@@ -1385,73 +1397,123 @@ if ($dashboardBg !== '') {
         // Initialize progress on first paint
         setVolumeSliderProgress();
         
-        // Loop button functionality
+                        // UI helpers for loop and play-all buttons (canonical keys)
+        function updateLoopButton(loopMode) {
+            try {
+                var btn = document.getElementById('loop-btn');
+                if (!btn) return;
+                var label = btn.querySelector('.label');
+                if (label) label.textContent = (loopMode === 'on' ? 'Loop On' : 'Loop');
+                btn.className = (loopMode === 'on' ? 'btn primary' : 'btn secondary');
+            } catch (e) { /* no-op */ }
+        }
+
+        function updatePlayAllButton(playAllMode) {
+            try {
+                var btn = document.getElementById('all-btn');
+                if (!btn) return;
+                var label = btn.querySelector('.label');
+                if (label) label.textContent = (playAllMode === 'on' ? 'Play All On' : 'Play All');
+                btn.className = (playAllMode === 'on' ? 'btn primary' : 'btn secondary');
+            } catch (e) { /* no-op */ }
+        }
+// Loop button functionality
         const loopBtn = document.getElementById('loop-btn');
-        loopBtn.addEventListener('click', () => {
-            fetch('api.php?action=get_loop_mode&' + profileQuery).then(res => res.json()).then(data => {
-                const newLoopMode = data.loop === 'on' ? 'off' : 'on';
-                const formData = new FormData();
-                formData.append('loop', newLoopMode);
-                formData.append('profile', profileParam);
-                return fetch('api.php?action=set_loop_mode', {
-                    method: 'POST',
-                    body: formData
-                });
-            }).then(res => res.json()).then(data => {
-                updateLoopButton(data.loop);
-            }).catch(err => console.error('Loop toggle failed:', err));
-        });
-        
+        if (loopBtn) {
+            loopBtn.addEventListener('click', () => {
+                const currLabel = (loopBtn.querySelector('.label') || {}).textContent || 'Loop';
+                const optimisticMode = currLabel.indexOf('On') !== -1 ? 'off' : 'on';
+                updateLoopButton(optimisticMode);
+                loopBtn.disabled = true;
+
+                fetch('api.php?action=get_loop_mode&' + profileQuery)
+                    .then(res => res.json())
+                    .then(data => {
+                        const currentMode = (typeof data.loopMode === 'string') ? data.loopMode : (data.loop || 'off');
+                        const newLoopMode = currentMode === 'on' ? 'off' : 'on';
+                        const formData = new FormData();
+                        formData.append('loopMode', newLoopMode);
+                        formData.append('profile', profileParam);
+                        return fetch('api.php?action=set_loop_mode', { method: 'POST', body: formData });
+                    })
+                    .then(res => res.json())
+                    .then(data => {
+                        const mode = (typeof data.loopMode === 'string') ? data.loopMode : (data.loop || 'off');
+                        updateLoopButton(mode);
+                    })
+                    .catch(err => {
+                        console.error('Loop toggle failed:', err);
+                        fetch('api.php?action=get_loop_mode&' + profileQuery)
+                            .then(r => r.json())
+                            .then(d => {
+                                const mode = (typeof d.loopMode === 'string') ? d.loopMode : (d.loop || 'off');
+                                updateLoopButton(mode);
+                            })
+                            .catch(() => {});
+                    })
+                    .finally(() => { loopBtn.disabled = false; });
+            });
+        }
+
         // Play All button functionality
         const allBtn = document.getElementById('all-btn');
-        allBtn.addEventListener('click', () => {
-            fetch('api.php?action=get_play_all_mode&' + profileQuery).then(res => res.json()).then(data => {
-                const newPlayAllMode = data.play_all === 'on' ? 'off' : 'on';
-                const formData = new FormData();
-                formData.append('play_all', newPlayAllMode);
-                formData.append('profile', profileParam);
-                return fetch('api.php?action=set_play_all_mode', {
-                    method: 'POST',
-                    body: formData
-                });
-            }).then(res => res.json()).then(data => {
-                updatePlayAllButton(data.play_all);
-            }).catch(err => console.error('Play All toggle failed:', err));
-        });
-        
-        // Function to update loop button state
-        function updateLoopButton(loopMode) {
-            loopBtn.textContent = loopMode === 'on' ? '🔁 Loop On' : '🔁 Loop';
-            loopBtn.className = loopMode === 'on' ? 'btn primary' : 'btn secondary';
+        if (allBtn) {
+            allBtn.addEventListener('click', () => {
+                const currLabel = (allBtn.querySelector('.label') || {}).textContent || 'Play All';
+                const optimisticMode = currLabel.indexOf('On') !== -1 ? 'off' : 'on';
+                updatePlayAllButton(optimisticMode);
+                allBtn.disabled = true;
+
+                fetch('api.php?action=get_play_all_mode&' + profileQuery)
+                    .then(res => res.json())
+                    .then(data => {
+                        const currentMode = (typeof data.playAllMode === 'string') ? data.playAllMode : (data.play_all || 'off');
+                        const newPlayAllMode = currentMode === 'on' ? 'off' : 'on';
+                        const formData = new FormData();
+                        formData.append('playAllMode', newPlayAllMode);
+                        formData.append('profile', profileParam);
+                        return fetch('api.php?action=set_play_all_mode', { method: 'POST', body: formData });
+                    })
+                    .then(res => res.json())
+                    .then(data => {
+                        const mode = (typeof data.playAllMode === 'string') ? data.playAllMode : (data.play_all || 'off');
+                        updatePlayAllButton(mode);
+                    })
+                    .catch(err => {
+                        console.error('Play All toggle failed:', err);
+                        fetch('api.php?action=get_play_all_mode&' + profileQuery)
+                            .then(r => r.json())
+                            .then(d => {
+                                const mode = (typeof d.playAllMode === 'string') ? d.playAllMode : (d.play_all || 'off');
+                                updatePlayAllButton(mode);
+                            })
+                            .catch(() => {});
+                    })
+                    .finally(() => { allBtn.disabled = false; });
+            });
         }
-        
-        // Function to update play all button state
-        function updatePlayAllButton(playAllMode) {
-            allBtn.textContent = playAllMode === 'on' ? '📺 Play All On' : '📺 Play All';
-            allBtn.className = playAllMode === 'on' ? 'btn primary' : 'btn secondary';
-        }
-        
         // Load initial loop, play all, and external audio states
         Promise.all([
             fetch('api.php?action=get_loop_mode&' + profileQuery).then(res => res.json()),
             fetch('api.php?action=get_play_all_mode&' + profileQuery).then(res => res.json()),
             fetch('api.php?action=get_external_audio_mode&' + profileQuery).then(res => res.json())
         ]).then(([loopData, playAllData, externalData]) => {
-            updateLoopButton(loopData.loop);
-            updatePlayAllButton(playAllData.play_all);
+            const loopInit = (typeof loopData.loopMode === 'string') ? loopData.loopMode : (loopData.loop || 'off');
+            const playAllInit = (typeof playAllData.playAllMode === 'string') ? playAllData.playAllMode : (playAllData.play_all || 'off');
+            updateLoopButton(loopInit);
+            updatePlayAllButton(playAllInit);
             if (typeof setExternalAudioUI === 'function') {
-                setExternalAudioUI(externalData.external === 'on');
+                setExternalAudioUI(externalData.external === "on");
             }
         }).catch(() => {});
-        
-        // External audio mode controls
         const externalAudioBtn = document.getElementById('external-audio-btn');
         const externalAudioBanner = document.getElementById('external-audio-banner');
         const externalHelpBtn = document.getElementById('external-help-btn');
 
         function setExternalAudioUI(isOn) {
             if (!externalAudioBtn) return;
-            externalAudioBtn.textContent = isOn ? '🔈 External Audio On' : '🔈 External Audio';
+            const label = externalAudioBtn.querySelector('.label');
+            if (label) label.textContent = isOn ? 'External Audio On' : 'External Audio';
             externalAudioBtn.className = isOn ? 'btn primary' : 'btn secondary';
             if (externalAudioBanner) externalAudioBanner.style.display = isOn ? 'flex' : 'none';
             if (isOn) {
@@ -1596,3 +1658,4 @@ if ($dashboardBg !== '') {
     </script>
 </body>
 </html>
+

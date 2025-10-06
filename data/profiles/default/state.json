@@ -1,17 +1,17 @@
 {
     "currentVideo": {
-        "filename": "Sacred Geometry.mkv",
+        "filename": "Central Park.mkv",
         "dirIndex": 0
     },
     "playbackState": "play",
-    "volume": 25,
+    "volume": 45,
     "muted": false,
-    "loopMode": "off",
+    "loopMode": "on",
     "playAllMode": "off",
     "externalAudioMode": "off",
-    "lastControlChange": 1756460379,
+    "lastControlChange": 1759741235,
     "lastConfigCheck": 0,
-    "lastScan": 1756454048,
-    "lastRefreshTrigger": 1756459681,
-    "refreshRequested": true
+    "lastScan": 1759741043,
+    "lastRefreshTrigger": 1759406309,
+    "refreshRequested": false
 }

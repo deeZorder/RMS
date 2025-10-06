@@ -1,0 +1,15 @@
+{
+    "currentVideo": {
+        "filename": "Wild Africa.mkv",
+        "dirIndex": 0
+    },
+    "playbackState": "play",
+    "volume": 5,
+    "muted": false,
+    "loopMode": "off",
+    "playAllMode": "off",
+    "externalAudioMode": "off",
+    "lastControlChange": 1759741431,
+    "lastConfigCheck": 0,
+    "lastScan": 1759741229
+}

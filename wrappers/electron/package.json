@@ -1,0 +1,16 @@
+{
+  "name": "rms-screen-electron",
+  "version": "1.0.0",
+  "private": true,
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "start:url": "cross-env RMS_URL=http://localhost/RMS/screen_native_wrapper.php?profile=default&audio=1 electron ."
+  },
+  "dependencies": {
+    "electron": "29.4.6",
+    "cross-env": "7.0.3"
+  }
+}
+
+

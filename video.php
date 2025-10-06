@@ -33,11 +33,6 @@ function safeOutput($data) {
     }
     echo $data;
     flush();
-    
-    // Windows Server specific flush
-    if (function_exists('fastcgi_finish_request')) {
-        fastcgi_finish_request();
-    }
 }
 
 // Get the video filename and optional directory index from the URL
@@ -120,6 +115,8 @@ switch ($ext) {
         $mimeType = 'video/x-matroska';
         break;
 }
+
+// Remove MIME override logic to allow native container detection
 
 // Windows Server specific headers
 header('Content-Type: ' . $mimeType);

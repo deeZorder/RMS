@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 /**
  * API endpoint for admin actions
  */
@@ -41,7 +41,7 @@ $readOnlyActions = [
     'get_play_all_mode',
     'get_external_audio_mode',
     'get_video_titles',
-    'get_all_videos',
+    'get_next_video',
     'check_config_changes',
     'check_refresh_signal',
     'test_connection',
@@ -266,6 +266,10 @@ switch ($action) {
         getAllVideos();
         break;
 
+    case 'get_next_video':
+        getNextVideo();
+        break;
+
     case 'check_config_changes':
         checkConfigChanges();
         break;
@@ -291,6 +295,10 @@ switch ($action) {
         break;
     case 'reindex_previews':
         reindexPreviews();
+        break;
+
+    case 'reindex_thumbs':
+        reindexThumbs();
         break;
 
     case 'browse_directories':
@@ -605,6 +613,13 @@ function warmThumbnails() {
         $processed = 0;
         $failed = 0;
 
+        // Cache ffmpeg availability once per request
+        $which = (stripos(PHP_OS, 'WIN') === 0) ? 'where' : 'which';
+        $cmdCheck = $which . ' ffmpeg' . (stripos(PHP_OS, 'WIN') === 0 ? ' 2> NUL' : ' 2> /dev/null');
+        @exec($cmdCheck, $__out, $__code);
+        $ffmpegAvailable = ($__code === 0);
+
+
         for ($i = $offset; $i < $end; $i++) {
             $entry = $targets[$i];
             $videoPath = '';
@@ -659,12 +674,8 @@ function warmThumbnails() {
                         }
                     } catch (Exception $__) {}
                 } else {
-                    // Check ffmpeg availability
-                    $which = (stripos(PHP_OS, 'WIN') === 0) ? 'where' : 'which';
-                    $cmdCheck = $which . ' ffmpeg' . (stripos(PHP_OS, 'WIN') === 0 ? ' 2> NUL' : ' 2> /dev/null');
-                    @exec($cmdCheck, $out, $code);
-                    
-                    if ($code === 0) {
+                    // Use cached ffmpeg availability
+                    if ($ffmpegAvailable) {
                         $escapedIn = escapeshellarg($videoPath);
                         $escapedOut = escapeshellarg($thumbPath);
                         $cmd = 'ffmpeg -ss 1 -i ' . $escapedIn . ' -frames:v 1 -vf "scale=480:-1" -q:v 5 -y ' . $escapedOut . (stripos(PHP_OS, 'WIN') === 0 ? ' 2> NUL' : ' 2> /dev/null');
@@ -796,6 +807,13 @@ function warmPreviews() {
         $end = min($totalTargets, $offset + $batch);
         $processed = 0;
         $failed = 0;
+
+        // Cache ffmpeg availability once per request
+        $which = (stripos(PHP_OS, 'WIN') === 0) ? 'where' : 'which';
+        $cmdCheck = $which . ' ffmpeg' . (stripos(PHP_OS, 'WIN') === 0 ? ' 2> NUL' : ' 2> /dev/null');
+        @exec($cmdCheck, $__out2, $__code2);
+        $ffmpegAvailable2 = ($__code2 === 0);
+
         
         for ($i = $offset; $i < $end; $i++) {
             $entry = $targets[$i];
@@ -851,12 +869,8 @@ function warmPreviews() {
                         }
                     } catch (Exception $__) {}
                 } else {
-                    // Check ffmpeg availability
-                    $which = (stripos(PHP_OS, 'WIN') === 0) ? 'where' : 'which';
-                    $cmdCheck = $which . ' ffmpeg' . (stripos(PHP_OS, 'WIN') === 0 ? ' 2> NUL' : ' 2> /dev/null');
-                    @exec($cmdCheck, $out, $code);
-                    
-                    if ($code === 0) {
+                    // Use cached ffmpeg availability
+                    if ($ffmpegAvailable2) {
                         $escapedIn = escapeshellarg($videoPath);
                         $escapedOut = escapeshellarg($previewPath);
                         
@@ -1004,6 +1018,80 @@ function reindexPreviews() {
     }
 }
 
+function reindexThumbs() {
+    try {
+        $adminCachePath = __DIR__ . '/data/admin_cache.json';
+        $thumbDir = __DIR__ . '/data/thumbs';
+        if (!is_file($adminCachePath)) {
+            echo json_encode(['status' => 'ok', 'updated' => 0, 'total' => 0, 'missing' => 0, 'message' => 'admin_cache.json not found']);
+            return;
+        }
+        if (!is_dir($thumbDir)) {
+            @mkdir($thumbDir, 0777, true);
+        }
+        $cache = json_decode(@file_get_contents($adminCachePath), true) ?: [];
+        if (empty($cache['all_video_files']) || !is_array($cache['all_video_files'])) {
+            echo json_encode(['status' => 'ok', 'updated' => 0, 'total' => 0, 'missing' => 0, 'message' => 'No videos in cache']);
+            return;
+        }
+        $all = &$cache['all_video_files'];
+        $updated = 0;
+        $total = count($all);
+        foreach ($all as &$entry) {
+            $name = isset($entry['name']) ? (string)$entry['name'] : '';
+            $di = (int)($entry['dirIndex'] ?? 0);
+            if ($name === '') { continue; }
+            // Resolve video path similar to warmers
+            $videoPath = '';
+            if (!empty($entry['path'])) {
+                $videoPath = (string)$entry['path'];
+            } else {
+                $dirs = getConfiguredDirectories();
+                if (isset($dirs[$di])) {
+                    $sep = (strpos($dirs[$di], ':\\') !== false) ? '\\' : '/';
+                    $videoPath = rtrim($dirs[$di], '\\/') . $sep . $name;
+                }
+            }
+            if ($videoPath === '' || !is_file($videoPath)) { continue; }
+            $mtime = @filemtime($videoPath) ?: 0;
+            // Build candidate hashes matching warmThumbnails logic (path normalized and possibly lowercased on Windows)
+            $candidates = [];
+            foreach ([$videoPath] as $p) {
+                $np_os = str_replace(['\\','/'], DIRECTORY_SEPARATOR, $p);
+                $candidates[] = sha1($np_os . '|' . $mtime);
+                $np_os_lower = (stripos(PHP_OS, 'WIN') === 0) ? strtolower($np_os) : $np_os;
+                $candidates[] = sha1($np_os_lower . '|' . $mtime);
+                $np_fwd = str_replace(['\\','/'], '/', $p);
+                $candidates[] = sha1($np_fwd . '|' . $mtime);
+                $np_fwd_lower = (stripos(PHP_OS, 'WIN') === 0) ? strtolower($np_fwd) : $np_fwd;
+                $candidates[] = sha1($np_fwd_lower . '|' . $mtime);
+            }
+            $foundHash = null;
+            foreach (array_unique($candidates) as $h) {
+                $p = $thumbDir . DIRECTORY_SEPARATOR . $h . '.jpg';
+                if (is_file($p)) { $foundHash = $h; break; }
+            }
+            if ($foundHash) {
+                if (empty($entry['thumb_hash']) || $entry['thumb_hash'] !== $foundHash) {
+                    $entry['thumb_hash'] = $foundHash;
+                    $entry['thumb_mtime'] = $mtime;
+                    $updated++;
+                }
+            }
+        }
+        unset($entry);
+        // Save back if updated
+        if ($updated > 0) {
+            @file_put_contents($adminCachePath, json_encode($cache, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+        }
+        $mapped = 0;
+        foreach ($all as $e) { if (!empty($e['thumb_hash'])) $mapped++; }
+        echo json_encode(['status' => 'ok', 'updated' => $updated, 'total' => $total, 'mapped' => $mapped, 'missing' => max(0, $total - $mapped)]);
+    } catch (Exception $e) {
+        echo json_encode(['status' => 'error', 'error' => $e->getMessage()]);
+    }
+}
+
 function getVolume() {
     try {
         $profileId = $_GET['profile'] ?? 'default';
@@ -1125,6 +1213,7 @@ function toggleMute() {
         $currentMuted = isset($state['muted']) ? (bool)$state['muted'] : false;
         $state['muted'] = !$currentMuted;
         $state['lastControlChange'] = time();
+        file_put_contents($stateFile, json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
 
         file_put_contents($stateFile, json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
 
@@ -1155,6 +1244,7 @@ function playVideo() {
             $state = json_decode(file_get_contents($stateFile), true);
             $state['playbackState'] = 'play';
             $state['lastControlChange'] = time();
+        file_put_contents($stateFile, json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
             file_put_contents($stateFile, json_encode($state, JSON_PRETTY_PRINT));
         }
 
@@ -1184,6 +1274,7 @@ function pauseVideo() {
             $state = json_decode(file_get_contents($stateFile), true);
             $state['playbackState'] = 'pause';
             $state['lastControlChange'] = time();
+        file_put_contents($stateFile, json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
             file_put_contents($stateFile, json_encode($state, JSON_PRETTY_PRINT));
         }
 
@@ -1213,6 +1304,7 @@ function stopVideo() {
             $state = json_decode(file_get_contents($stateFile), true);
             $state['playbackState'] = 'stop';
             $state['lastControlChange'] = time();
+        file_put_contents($stateFile, json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
             file_put_contents($stateFile, json_encode($state, JSON_PRETTY_PRINT));
         }
 
@@ -1249,10 +1341,9 @@ function setCurrentVideo() {
         $stateFile = $statePath . '/state.json';
         $state = file_exists($stateFile) ? json_decode(file_get_contents($stateFile), true) : [];
         $state['currentVideo'] = ['filename' => $filename, 'dirIndex' => $dirIndex];
+        $state['playbackState'] = 'stop';
         $state['lastControlChange'] = time();
-
-        file_put_contents($stateFile, json_encode($state, JSON_PRETTY_PRINT));
-
+        file_put_contents($stateFile, json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
         header('Content-Type: application/json');
         header('Access-Control-Allow-Origin: *');
         header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
@@ -1280,6 +1371,7 @@ function clearCurrentVideo() {
             $state['currentVideo'] = ['filename' => '', 'dirIndex' => 0];
             $state['playbackState'] = 'stop';
             $state['lastControlChange'] = time();
+        file_put_contents($stateFile, json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
             file_put_contents($stateFile, json_encode($state, JSON_PRETTY_PRINT));
         }
 
@@ -1330,14 +1422,48 @@ function getPlaybackState() {
         $statePath = __DIR__ . '/data/profiles/' . preg_replace('/[^a-zA-Z0-9_\-]/', '', $profileId) . '/state.json';
 
         $state = 'stop';
+        $stateData = [];
         if (file_exists($statePath)) {
-            $stateData = json_decode(file_get_contents($statePath), true);
+            $stateData = json_decode(file_get_contents($statePath), true) ?: [];
             if (is_array($stateData) && isset($stateData['playbackState'])) {
                 $state = $stateData['playbackState'];
             }
         }
 
-        // Ensure we always return valid JSON
+        // Auto-stop heuristic when video likely ended and no loop/play-all
+        if (
+            $state === 'play' &&
+            isset($stateData) && is_array($stateData) &&
+            ($stateData['loopMode'] ?? 'off') !== 'on' &&
+            ($stateData['playAllMode'] ?? 'off') !== 'on'
+        ) {
+            $current = $stateData['currentVideo'] ?? null;
+            $started = (int)($stateData['lastControlChange'] ?? 0);
+            if (is_array($current) && !empty($current['filename']) && $started > 0) {
+                try {
+                    $dirs = getConfiguredDirectories();
+                    $di = (int)($current['dirIndex'] ?? 0);
+                    $root = $dirs[$di] ?? ($dirs[0] ?? (__DIR__ . '/videos'));
+                    $sep = (strpos($root, ':\\') !== false) ? '\\' : '/';
+                    $abs = rtrim($root, '\\/') . $sep . $current['filename'];
+                    if (is_file($abs)) {
+                        $cmd = (stripos(PHP_OS, 'WIN') === 0 ? 'ffprobe.exe' : 'ffprobe');
+                        $escaped = escapeshellarg($abs);
+                        $out = @shell_exec($cmd . ' -v quiet -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 -- ' . $escaped);
+                        $duration = (float)trim((string)$out);
+                        if ($duration > 0) {
+                            $elapsed = time() - $started;
+                            if ($elapsed >= ($duration - 1)) {
+                                $state = 'stop';
+                                $stateData['playbackState'] = 'stop';
+                                @file_put_contents($statePath, json_encode($stateData, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+                            }
+                        }
+                    }
+                } catch (Throwable $__ ) { /* ignore probe errors */ }
+            }
+        }
+
         header('Content-Type: application/json');
         header('Access-Control-Allow-Origin: *');
         header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
@@ -1525,7 +1651,6 @@ function getLoopMode() {
     try {
         $profileId = $_GET['profile'] ?? 'default';
         $statePath = __DIR__ . '/data/profiles/' . preg_replace('/[^a-zA-Z0-9_\-]/', '', $profileId) . '/state.json';
-
         $loop = 'off';
         if (file_exists($statePath)) {
             $stateData = json_decode(file_get_contents($statePath), true);
@@ -1533,12 +1658,11 @@ function getLoopMode() {
                 $loop = $stateData['loopMode'];
             }
         }
-
         header('Content-Type: application/json');
         header('Access-Control-Allow-Origin: *');
         header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
         header('Access-Control-Allow-Headers: Content-Type, X-Requested-With');
-        echo json_encode(['success' => true, 'loop' => $loop]);
+        echo json_encode(['success' => true, 'loopMode' => $loop]);
     } catch (Exception $e) {
         header('Content-Type: application/json');
         header('Access-Control-Allow-Origin: *');
@@ -1546,38 +1670,22 @@ function getLoopMode() {
         header('Access-Control-Allow-Headers: Content-Type, X-Requested-With');
         echo json_encode(['success' => false, 'error' => $e->getMessage()]);
     }
-}
-
-function setLoopMode() {
+}function setLoopMode() {
     try {
         $profileId = $_POST['profile'] ?? 'default';
-        $loop = $_POST['loop'] ?? 'off';
-        
-        if (!in_array($loop, ['on', 'off'])) {
-            throw new Exception('Invalid loop mode');
-        }
-        
+        $loop = $_POST['loopMode'] ?? ($_POST['loop'] ?? 'off');
+        if (!in_array($loop, ['on', 'off'])) { throw new Exception('Invalid loop mode'); }
         $profileDir = __DIR__ . '/data/profiles/' . preg_replace('/[^a-zA-Z0-9_\-]/', '', $profileId);
-        if (!is_dir($profileDir)) {
-            mkdir($profileDir, 0777, true);
-        }
-        
+        if (!is_dir($profileDir)) { mkdir($profileDir, 0777, true); }
         $statePath = $profileDir . '/state.json';
-        
-        // Load existing state or create new
         $stateData = [];
-        if (file_exists($statePath)) {
-            $stateData = json_decode(file_get_contents($statePath), true) ?: [];
-        }
-        
-        // Set loop mode
+        if (file_exists($statePath)) { $stateData = json_decode(file_get_contents($statePath), true) ?: []; }
         $stateData['loopMode'] = $loop;
         $stateData['lastControlChange'] = time();
-        
-        // Save updated state
         file_put_contents($statePath, json_encode($stateData, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
-        
-        echo json_encode(['success' => true, 'loop' => $loop]);
+        header('Content-Type: application/json');
+        header('Access-Control-Allow-Origin: *');
+        echo json_encode(['success' => true, 'loopMode' => $loop]);
     } catch (Exception $e) {
         header('Content-Type: application/json');
         header('Access-Control-Allow-Origin: *');
@@ -1585,13 +1693,10 @@ function setLoopMode() {
         header('Access-Control-Allow-Headers: Content-Type, X-Requested-With');
         echo json_encode(['success' => false, 'error' => $e->getMessage()]);
     }
-}
-
-function getPlayAllMode() {
+}function getPlayAllMode() {
     try {
         $profileId = $_GET['profile'] ?? 'default';
         $statePath = __DIR__ . '/data/profiles/' . preg_replace('/[^a-zA-Z0-9_\-]/', '', $profileId) . '/state.json';
-
         $playAll = 'off';
         if (file_exists($statePath)) {
             $stateData = json_decode(file_get_contents($statePath), true);
@@ -1599,12 +1704,11 @@ function getPlayAllMode() {
                 $playAll = $stateData['playAllMode'];
             }
         }
-
         header('Content-Type: application/json');
         header('Access-Control-Allow-Origin: *');
         header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
         header('Access-Control-Allow-Headers: Content-Type, X-Requested-With');
-        echo json_encode(['success' => true, 'play_all' => $playAll]);
+        echo json_encode(['success' => true, 'playAllMode' => $playAll]);
     } catch (Exception $e) {
         header('Content-Type: application/json');
         header('Access-Control-Allow-Origin: *');
@@ -1612,38 +1716,22 @@ function getPlayAllMode() {
         header('Access-Control-Allow-Headers: Content-Type, X-Requested-With');
         echo json_encode(['success' => false, 'error' => $e->getMessage()]);
     }
-}
-
-function setPlayAllMode() {
+}function setPlayAllMode() {
     try {
         $profileId = $_POST['profile'] ?? 'default';
-        $playAll = $_POST['play_all'] ?? 'off';
-        
-        if (!in_array($playAll, ['on', 'off'])) {
-            throw new Exception('Invalid play all mode');
-        }
-        
+        $playAll = $_POST['playAllMode'] ?? ($_POST['play_all'] ?? 'off');
+        if (!in_array($playAll, ['on', 'off'])) { throw new Exception('Invalid play all mode'); }
         $profileDir = __DIR__ . '/data/profiles/' . preg_replace('/[^a-zA-Z0-9_\-]/', '', $profileId);
-        if (!is_dir($profileDir)) {
-            mkdir($profileDir, 0777, true);
-        }
-        
+        if (!is_dir($profileDir)) { mkdir($profileDir, 0777, true); }
         $statePath = $profileDir . '/state.json';
-        
-        // Load existing state or create new
         $stateData = [];
-        if (file_exists($statePath)) {
-            $stateData = json_decode(file_get_contents($statePath), true) ?: [];
-        }
-        
-        // Set play all mode
+        if (file_exists($statePath)) { $stateData = json_decode(file_get_contents($statePath), true) ?: []; }
         $stateData['playAllMode'] = $playAll;
         $stateData['lastControlChange'] = time();
-        
-        // Save updated state
         file_put_contents($statePath, json_encode($stateData, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
-        
-        echo json_encode(['success' => true, 'play_all' => $playAll]);
+        header('Content-Type: application/json');
+        header('Access-Control-Allow-Origin: *');
+        echo json_encode(['success' => true, 'playAllMode' => $playAll]);
     } catch (Exception $e) {
         header('Content-Type: application/json');
         header('Access-Control-Allow-Origin: *');
@@ -1651,9 +1739,7 @@ function setPlayAllMode() {
         header('Access-Control-Allow-Headers: Content-Type, X-Requested-With');
         echo json_encode(['success' => false, 'error' => $e->getMessage()]);
     }
-}
-
-function getExternalAudioMode() {
+}function getExternalAudioMode() {
     try {
         $profileId = $_GET['profile'] ?? 'default';
         $statePath = __DIR__ . '/data/profiles/' . preg_replace('/[^a-zA-Z0-9_\-]/', '', $profileId) . '/state.json';
@@ -1929,23 +2015,53 @@ function checkRefreshSignal() {
         $base = __DIR__;
         $profileDir = $base . '/data/profiles/' . $profileSafe;
 
-        // Check multiple legacy and current refresh signal paths
-        $candidates = [
-            $profileDir . '/refresh.txt',                    // current simple path (this file used previously in api.php)
-            $profileDir . '/dashboard_refresh.txt',          // legacy/admin handler path
-            $base . '/data/dashboard_refresh.txt',           // older global path
-            $base . '/dashboard_refresh.txt',                // very old global path in root
-        ];
-
         $shouldRefresh = false;
-        foreach ($candidates as $p) {
-            if (is_file($p)) {
-                $shouldRefresh = true;
-                @unlink($p);
+
+        // First: check state-based refresh flags (prefer direct file read to avoid loader issues)
+        $stateChecked = false;
+        try {
+            $statePath = $profileDir . '/state.json';
+            if (is_file($statePath)) {
+                $raw = @file_get_contents($statePath);
+                if ($raw !== false) {
+                    $state = json_decode($raw, true);
+                    if (is_array($state)) {
+                        if (isset($state['refreshRequested']) && $state['refreshRequested'] === true) {
+                            $lastRefreshTrigger = isset($state['lastRefreshTrigger']) ? (int)$state['lastRefreshTrigger'] : 0;
+                            $currentTime = time();
+                            if ($currentTime - $lastRefreshTrigger < 30) {
+                                $shouldRefresh = true;
+                                // Best-effort clear flag
+                                $state['refreshRequested'] = false;
+                                @file_put_contents($statePath, json_encode($state, JSON_PRETTY_PRINT));
+                            }
+                        }
+                        $stateChecked = true;
+                    }
+                }
+            }
+        } catch (Throwable $t) {
+            // Ignore state errors and fall back to file-based checks
+        }
+
+        // Fallback: check legacy file-based refresh markers
+        if (!$shouldRefresh) {
+            $candidates = [
+                $profileDir . '/refresh.txt',            // legacy simple path
+                $profileDir . '/dashboard_refresh.txt',  // legacy/admin handler path
+                $base . '/data/dashboard_refresh.txt',   // older global path
+                $base . '/dashboard_refresh.txt',        // very old global path in root
+            ];
+            foreach ($candidates as $p) {
+                if (is_file($p)) {
+                    $shouldRefresh = true;
+                    @unlink($p);
+                    break;
+                }
             }
         }
 
-        echo json_encode(['success' => true, 'should_refresh' => $shouldRefresh]);
+        echo json_encode(['success' => true, 'should_refresh' => $shouldRefresh, 'stateChecked' => $stateChecked]);
     } catch (Exception $e) {
         header('Content-Type: application/json');
         header('Access-Control-Allow-Origin: *');
@@ -2147,4 +2263,106 @@ function browseDirectories() {
         echo json_encode(['error' => 'Failed to browse directory: ' . $e->getMessage()]);
     }
 }
-?>
+function getNextVideo() {
+    try {
+        $profileId = isset($_GET['profile']) ? (string)$_GET['profile'] : 'default';
+        $profileSafe = preg_replace('/[^a-zA-Z0-9_\-]/', '', $profileId);
+        
+        // Load current state
+        $statePath = __DIR__ . '/data/profiles/' . $profileSafe . '/state.json';
+        $state = [ 'currentVideo' => ['filename' => '', 'dirIndex' => 0] ];
+        if (is_file($statePath)) {
+            $raw = @file_get_contents($statePath);
+            $dec = $raw !== false ? json_decode($raw, true) : null;
+            if (is_array($dec)) { $state = array_merge($state, $dec); }
+        }
+
+        // If loop mode is on, return the current video as the next video
+        if (isset($state['loopMode']) && $state['loopMode'] === 'on') {
+            $cur = $state['currentVideo'];
+            if (!empty($cur['filename'])) {
+                echo json_encode([
+                    'success' => true,
+                    'nextVideo' => [
+                        'name' => (string)$cur['filename'],
+                        'dirIndex' => (int)($cur['dirIndex'] ?? 0)
+                    ]
+                ]);
+                return;
+            }
+        }
+        
+        // Resolve configured directories
+        $dirs = getConfiguredDirectories();
+        $allowedExt = ['mp4','webm','ogg','mov','mkv','avi','wmv','flv'];
+        
+        // Build library of all videos
+        $all = [];
+        foreach ($dirs as $i => $dir) {
+            if (!is_dir($dir)) continue;
+            $items = @scandir($dir);
+            if ($items === false) continue;
+            foreach ($items as $file) {
+                if ($file === '.' || $file === '..') continue;
+                $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
+                if (in_array($ext, $allowedExt, true)) {
+                    $all[] = [ 'name' => $file, 'dirIndex' => $i, 'dirPath' => $dir, 'key' => $dir . '|' . $file ];
+                }
+            }
+        }
+        
+        // Load saved video order
+        $orderPath = __DIR__ . '/data/profiles/' . $profileSafe . '/video_order.json';
+        $savedOrder = [];
+        if (is_file($orderPath)) {
+            $dec = json_decode(@file_get_contents($orderPath), true);
+            if (is_array($dec) && isset($dec['order']) && is_array($dec['order'])) { $savedOrder = $dec['order']; }
+        }
+        
+        // Build ordered list: first from saved order, then any missing items
+        $ordered = [];
+        foreach ($savedOrder as $okey) {
+            if (strpos($okey, '|') === false) continue;
+            list($dirPath, $filename) = explode('|', $okey, 2);
+            $di = array_search($dirPath, $dirs);
+            if ($di !== false) { $ordered[] = ['name' => $filename, 'dirIndex' => (int)$di]; }
+        }
+        // Add missing
+        $existing = array_flip(array_map(function($a){ return $a['dirPath'].'|'.$a['name']; }, $all));
+        foreach ($all as $a) {
+            if (!isset($existing[$a['key']])) continue; // always true due to construction
+        }
+        // Compute ordered keys for membership
+        $orderedKeys = [];
+        foreach ($ordered as $o) {
+            $orderedKeys[] = (isset($dirs[$o['dirIndex']]) ? $dirs[$o['dirIndex']] : '') . '|' . $o['name'];
+        }
+        // Append any missing from library (sorted for stability)
+        $missing = array_values(array_filter($all, function($v) use ($orderedKeys){ return !in_array($v['key'], $orderedKeys, true); }));
+        usort($missing, function($a,$b){ $c = strcmp($a['name'],$b['name']); return $c !== 0 ? $c : ($a['dirIndex'] <=> $b['dirIndex']); });
+        foreach ($missing as $m) { $ordered[] = ['name'=>$m['name'], 'dirIndex'=>$m['dirIndex']]; }
+        
+        // Determine next based on current state
+        $next = null;
+        if (!empty($ordered)) {
+            $cur = $state['currentVideo'];
+            if (empty($cur['filename'])) {
+                $next = $ordered[0];
+            } else {
+                $idx = -1;
+                foreach ($ordered as $k => $v) {
+                    if ($v['name'] === $cur['filename'] && (int)$v['dirIndex'] === (int)$cur['dirIndex']) { $idx = $k; break; }
+                }
+                $next = $idx === -1 ? $ordered[0] : $ordered[($idx + 1) % count($ordered)];
+            }
+        }
+        
+        echo json_encode(['success' => true, 'nextVideo' => $next]);
+    } catch (Exception $e) {
+        header('Content-Type: application/json');
+        header('Access-Control-Allow-Origin: *');
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    }
+}
+
+

@@ -28,10 +28,14 @@ $currentSection = $_POST['current_section'] ?? 'directory-config';
                 return $this->handleDashboardSettings();
             case 'delete-dashboard':
                 return $this->handleDeleteDashboard();
+            case 'refresh-profile':
+                return $this->handleRefreshProfile();
             case 'clear-thumbs-titles':
                 return $this->handleClearThumbsTitles();
             case 'system-refresh':
                 return $this->handleSystemRefresh();
+            case 'system-refresh-screens':
+                return $this->handleSystemRefreshScreens();
             case 'refresh-dashboards':
                 return $this->handleRefreshDashboards();
             case 'generate-thumbnails':
@@ -166,6 +170,50 @@ $currentSection = $_POST['current_section'] ?? 'directory-config';
         $this->config->invalidateCache();
         $_SESSION['flash'] = ['type' => 'success', 'message' => "Dashboard refresh signal sent to {$refreshCount} dashboard profile(s)"];
         header('Location: admin.php?admin-panel=system-status');
+        exit;
+    }
+
+    private function handleSystemRefreshScreens() {
+        $profilesRefreshed = [];
+        $screens = $this->config->getScreens();
+        if (isset($screens['screens']) && is_array($screens['screens'])) {
+            foreach ($screens['screens'] as $screen) {
+                $p = isset($screen['profile']) ? (string)$screen['profile'] : 'default';
+                $p = preg_replace('/[^a-zA-Z0-9_\-]/', '', $p);
+                if ($p === '') { $p = 'default'; }
+                if (!isset($profilesRefreshed[$p])) {
+                    if ($this->triggerDashboardRefresh($p)) {
+                        $profilesRefreshed[$p] = true;
+                    } else {
+                        $profilesRefreshed[$p] = false;
+                    }
+                }
+            }
+        }
+
+        // Always include default in case no screens are registered
+        if (!isset($profilesRefreshed['default'])) {
+            $this->triggerDashboardRefresh('default');
+            $profilesRefreshed['default'] = true;
+        }
+
+        $count = count($profilesRefreshed);
+        $_SESSION['flash'] = ['type' => 'success', 'message' => "Screen refresh signal sent to {$count} profile(s)"];
+        header('Location: admin.php?admin-panel=system-status');
+        exit;
+    }
+
+    private function handleRefreshProfile() {
+        $dashboardId = trim((string)($_POST['dashboard_id'] ?? 'default')) ?: 'default';
+        $sanitized = preg_replace('/[^a-zA-Z0-9_\-]/', '', $dashboardId);
+        $profileId = $sanitized !== '' ? $sanitized : 'default';
+
+        $ok = $this->triggerDashboardRefresh($profileId);
+        $_SESSION['flash'] = [
+            'type' => $ok ? 'success' : 'error',
+            'message' => ($ok ? 'Refresh signal sent for profile: ' : 'Failed to send refresh for profile: ') . htmlspecialchars($profileId)
+        ];
+        header('Location: admin.php?admin-panel=screen-management#screen-management');
         exit;
     }
 

@@ -1,53 +1,138 @@
 {
-    "last_scan": 1756459681,
+    "last_scan": 1759740799,
     "available_directories": [
         ".git",
         "admin",
         "data",
         "handlers",
-        "videos"
+        "videos",
+        "wrappers"
     ],
-    "total_videos": 20,
+    "total_videos": 35,
     "all_video_files": [
         {
             "name": "Alien Worlds.mkv",
             "dirIndex": 0,
             "path": "videos\\Alien Worlds.mkv",
+            "thumb_hash": "6e7930038aff3c060d2b21ed34b3acebf347e2a0",
+            "thumb_mtime": 1756453954,
             "preview_hash": "6e7930038aff3c060d2b21ed34b3acebf347e2a0",
             "preview_mtime": 1756453954
         },
         {
-            "name": "Altai Mountains.mp4",
+            "name": "Altai Mountains.mkv",
             "dirIndex": 0,
-            "path": "videos\\Altai Mountains.mp4",
-            "preview_hash": "328e11c988b1363f667af54d39614546cc51e49e",
-            "preview_mtime": 1755596161
+            "path": "videos\\Altai Mountains.mkv",
+            "thumb_hash": "6022f9c8245171ddc8313281ff87c1f5c0701c71",
+            "thumb_mtime": 1756819482,
+            "preview_hash": "6022f9c8245171ddc8313281ff87c1f5c0701c71",
+            "preview_mtime": 1756819482
         },
         {
-            "name": "Amazon.mp4",
+            "name": "Amazon Rainforest.mkv",
             "dirIndex": 0,
-            "path": "videos\\Amazon.mp4",
-            "preview_hash": "1c4f0bf27a3a37537595841da99509d6ca93017f",
-            "preview_mtime": 1755598823
+            "path": "videos\\Amazon Rainforest.mkv",
+            "thumb_hash": "72c732dce164d5d336373367364ce0fb608d2fe1",
+            "thumb_mtime": 1756721203,
+            "preview_hash": "72c732dce164d5d336373367364ce0fb608d2fe1",
+            "preview_mtime": 1756721203
+        },
+        {
+            "name": "Beautiful Creatures.mkv",
+            "dirIndex": 0,
+            "path": "videos\\Beautiful Creatures.mkv",
+            "thumb_hash": "2ed03175346482e7caf79bb9cb98390dc0c0fa97",
+            "thumb_mtime": 1759739164,
+            "preview_hash": "2ed03175346482e7caf79bb9cb98390dc0c0fa97",
+            "preview_mtime": 1759739164
+        },
+        {
+            "name": "Birds Eye.mkv",
+            "dirIndex": 0,
+            "path": "videos\\Birds Eye.mkv",
+            "thumb_hash": "a9f66a7d7ef8a48ce287be26a573b0dfb8e241d2",
+            "thumb_mtime": 1758551787,
+            "preview_hash": "a9f66a7d7ef8a48ce287be26a573b0dfb8e241d2",
+            "preview_mtime": 1758551787
         },
         {
             "name": "Blue Aquarium.mp4",
             "dirIndex": 0,
             "path": "videos\\Blue Aquarium.mp4",
+            "thumb_hash": "d1c6292fde4d9c8233fa90173c28b53287528bcd",
+            "thumb_mtime": 1755594103,
             "preview_hash": "d1c6292fde4d9c8233fa90173c28b53287528bcd",
             "preview_mtime": 1755594103
         },
         {
-            "name": "Chobe Safari.mp4",
+            "name": "Central Park.mkv",
             "dirIndex": 0,
-            "path": "videos\\Chobe Safari.mp4",
-            "preview_hash": "d7a38baff218d9bc6174f2d983d2861ffa1d5778",
-            "preview_mtime": 1755597178
+            "path": "videos\\Central Park.mkv",
+            "thumb_hash": "2de0f7e9d7589caadbab6e59ce76e04a1cd2273e",
+            "thumb_mtime": 1757924002,
+            "preview_hash": "2de0f7e9d7589caadbab6e59ce76e04a1cd2273e",
+            "preview_mtime": 1757924002
+        },
+        {
+            "name": "Chobe Safari.mkv",
+            "dirIndex": 0,
+            "path": "videos\\Chobe Safari.mkv",
+            "thumb_hash": "5a54799c94941f1b899195e467771f045813edee",
+            "thumb_mtime": 1756821709,
+            "preview_hash": "5a54799c94941f1b899195e467771f045813edee",
+            "preview_mtime": 1756821709
+        },
+        {
+            "name": "Clouds Flair.mkv",
+            "dirIndex": 0,
+            "path": "videos\\Clouds Flair.mkv",
+            "thumb_hash": "5bd33281acb2016830ab040b4c6a41e8c4ce1df3",
+            "thumb_mtime": 1758551828,
+            "preview_hash": "5bd33281acb2016830ab040b4c6a41e8c4ce1df3",
+            "preview_mtime": 1758551828
+        },
+        {
+            "name": "Colorful Swimmers.mkv",
+            "dirIndex": 0,
+            "path": "videos\\Colorful Swimmers.mkv",
+            "thumb_hash": "bc09145b0a42da6d7f0fb383d3c497ef47e0cb32",
+            "thumb_mtime": 1759738121,
+            "preview_hash": "bc09145b0a42da6d7f0fb383d3c497ef47e0cb32",
+            "preview_mtime": 1759738121
+        },
+        {
+            "name": "Cozy Cottage.mkv",
+            "dirIndex": 0,
+            "path": "videos\\Cozy Cottage.mkv",
+            "thumb_hash": "37d905ad40f75e7c0ab819dadb1d99829a2abf97",
+            "thumb_mtime": 1758012319,
+            "preview_hash": "37d905ad40f75e7c0ab819dadb1d99829a2abf97",
+            "preview_mtime": 1758012319
+        },
+        {
+            "name": "Enchanted Oak.mkv",
+            "dirIndex": 0,
+            "path": "videos\\Enchanted Oak.mkv",
+            "thumb_hash": "2c4469bba841ab566694a60f27ff3eba31058cc1",
+            "thumb_mtime": 1757926929,
+            "preview_hash": "2c4469bba841ab566694a60f27ff3eba31058cc1",
+            "preview_mtime": 1757926929
+        },
+        {
+            "name": "Flower Magic.mkv",
+            "dirIndex": 0,
+            "path": "videos\\Flower Magic.mkv",
+            "thumb_hash": "b412191f739c6b7a9b23960fae0c4c372dac56ee",
+            "thumb_mtime": 1758012240,
+            "preview_hash": "b412191f739c6b7a9b23960fae0c4c372dac56ee",
+            "preview_mtime": 1758012240
         },
         {
             "name": "Forest River.mp4",
             "dirIndex": 0,
             "path": "videos\\Forest River.mp4",
+            "thumb_hash": "985f6d1ca8b5cef62935eaca2a569be48da23a77",
+            "thumb_mtime": 1755593132,
             "preview_hash": "985f6d1ca8b5cef62935eaca2a569be48da23a77",
             "preview_mtime": 1755593132
         },
@@ -55,34 +140,53 @@
             "name": "Fractal Therapy.mkv",
             "dirIndex": 0,
             "path": "videos\\Fractal Therapy.mkv",
+            "thumb_hash": "c1bf23f2e80302be769d7d29cde0299dc71fff16",
+            "thumb_mtime": 1756392174,
             "preview_hash": "c1bf23f2e80302be769d7d29cde0299dc71fff16",
             "preview_mtime": 1756392174
         },
         {
-            "name": "Green Forest.mp4",
+            "name": "Green Forest.mkv",
             "dirIndex": 0,
-            "path": "videos\\Green Forest.mp4",
-            "preview_hash": "02579d95feae8d590b915bf915cb3cfac8acc5bd",
-            "preview_mtime": 1755538660
+            "path": "videos\\Green Forest.mkv",
+            "thumb_hash": "4a11401cc483e0be99dd637ec90e14c5d5c42f93",
+            "thumb_mtime": 1756919456,
+            "preview_hash": "4a11401cc483e0be99dd637ec90e14c5d5c42f93",
+            "preview_mtime": 1756919456
+        },
+        {
+            "name": "Hope River.mkv",
+            "dirIndex": 0,
+            "path": "videos\\Hope River.mkv",
+            "thumb_hash": "73f750ddb4b56876e8f85c2b832ffea8cd6027dd",
+            "thumb_mtime": 1757923292,
+            "preview_hash": "73f750ddb4b56876e8f85c2b832ffea8cd6027dd",
+            "preview_mtime": 1757923292
         },
         {
             "name": "Hot Tub Ocean.mp4",
             "dirIndex": 0,
             "path": "videos\\Hot Tub Ocean.mp4",
+            "thumb_hash": "5a78d432c5bc4e162590bd697f8137cb5ebd2fba",
+            "thumb_mtime": 1755592319,
             "preview_hash": "5a78d432c5bc4e162590bd697f8137cb5ebd2fba",
             "preview_mtime": 1755592319
         },
         {
-            "name": "Khwai River.mp4",
+            "name": "Khwai River.mkv",
             "dirIndex": 0,
-            "path": "videos\\Khwai River.mp4",
-            "preview_hash": "cd6aeac661605c02efebc2bf88e6c527defc8e9c",
-            "preview_mtime": 1755595744
+            "path": "videos\\Khwai River.mkv",
+            "thumb_hash": "6246f21b124dd2bad1c4bba53b1f6c2877555d8b",
+            "thumb_mtime": 1756829042,
+            "preview_hash": "6246f21b124dd2bad1c4bba53b1f6c2877555d8b",
+            "preview_mtime": 1756829042
         },
         {
             "name": "Mind Journey.mkv",
             "dirIndex": 0,
             "path": "videos\\Mind Journey.mkv",
+            "thumb_hash": "07989e7833ac3aa93faaac2d5f081ddc36d95266",
+            "thumb_mtime": 1756392159,
             "preview_hash": "07989e7833ac3aa93faaac2d5f081ddc36d95266",
             "preview_mtime": 1756392159
         },
@@ -90,6 +194,8 @@
             "name": "Misty Trail.mp4",
             "dirIndex": 0,
             "path": "videos\\Misty Trail.mp4",
+            "thumb_hash": "8007c91a536bda6e43872d17e47a8bab71455cdb",
+            "thumb_mtime": 1755586246,
             "preview_hash": "8007c91a536bda6e43872d17e47a8bab71455cdb",
             "preview_mtime": 1755586246
         },
@@ -97,27 +203,53 @@
             "name": "Mountain River.mp4",
             "dirIndex": 0,
             "path": "videos\\Mountain River.mp4",
+            "thumb_hash": "a5370e498ed3324e22eb28c024b0bf645ca5e81c",
+            "thumb_mtime": 1755594598,
             "preview_hash": "a5370e498ed3324e22eb28c024b0bf645ca5e81c",
             "preview_mtime": 1755594598
         },
         {
-            "name": "New Zealand Tour.mp4",
+            "name": "New Zealand.mp4",
             "dirIndex": 0,
-            "path": "videos\\New Zealand Tour.mp4",
-            "preview_hash": "ce63ebe041f14271a717391dff6c964225e4fcfd",
+            "path": "videos\\New Zealand.mp4",
+            "thumb_hash": "d1fe9f2581b616558389d3b60a9286f4a66042ab",
+            "thumb_mtime": 1755598322,
+            "preview_hash": "d1fe9f2581b616558389d3b60a9286f4a66042ab",
             "preview_mtime": 1755598322
+        },
+        {
+            "name": "Ocean Life.mkv",
+            "dirIndex": 0,
+            "path": "videos\\Ocean Life.mkv",
+            "thumb_hash": "d11acb5d722ed5ec50d6cfa0a24083953dfd9b9c",
+            "thumb_mtime": 1759740190,
+            "preview_hash": "d11acb5d722ed5ec50d6cfa0a24083953dfd9b9c",
+            "preview_mtime": 1759740190
         },
         {
             "name": "Rocky Beach.mp4",
             "dirIndex": 0,
             "path": "videos\\Rocky Beach.mp4",
+            "thumb_hash": "e60080e2beffe1de23e6b060aec7022a8e3dc1d5",
+            "thumb_mtime": 1755164732,
             "preview_hash": "e60080e2beffe1de23e6b060aec7022a8e3dc1d5",
             "preview_mtime": 1755164732
+        },
+        {
+            "name": "Rustic Fireplace.mkv",
+            "dirIndex": 0,
+            "path": "videos\\Rustic Fireplace.mkv",
+            "thumb_hash": "1412fdc07ddc96e34f8670c7e1bd13e9de172d90",
+            "thumb_mtime": 1757931109,
+            "preview_hash": "1412fdc07ddc96e34f8670c7e1bd13e9de172d90",
+            "preview_mtime": 1757931109
         },
         {
             "name": "Sacred Geometry.mkv",
             "dirIndex": 0,
             "path": "videos\\Sacred Geometry.mkv",
+            "thumb_hash": "d9d09d57ca0aafafd2a674081b00b6b204712946",
+            "thumb_mtime": 1756392376,
             "preview_hash": "d9d09d57ca0aafafd2a674081b00b6b204712946",
             "preview_mtime": 1756392376
         },
@@ -125,6 +257,8 @@
             "name": "Soul Eternal.mkv",
             "dirIndex": 0,
             "path": "videos\\Soul Eternal.mkv",
+            "thumb_hash": "315dc98d0aaa7f374d38988668650d18cff0a58a",
+            "thumb_mtime": 1756392118,
             "preview_hash": "315dc98d0aaa7f374d38988668650d18cff0a58a",
             "preview_mtime": 1756392118
         },
@@ -132,22 +266,64 @@
             "name": "Sunset Beach.mp4",
             "dirIndex": 0,
             "path": "videos\\Sunset Beach.mp4",
+            "thumb_hash": "a1e08b2360544f13a50b7a18fad7a3756205e50c",
+            "thumb_mtime": 1755161268,
             "preview_hash": "a1e08b2360544f13a50b7a18fad7a3756205e50c",
             "preview_mtime": 1755161268
         },
         {
-            "name": "Swiss Alps.mp4",
+            "name": "Swiss Alps.mkv",
             "dirIndex": 0,
-            "path": "videos\\Swiss Alps.mp4",
-            "preview_hash": "b3498cc862aea2c8b662a499cd79f812022ab462",
-            "preview_mtime": 1755595172
+            "path": "videos\\Swiss Alps.mkv",
+            "thumb_hash": "98e02aaf76caea06d2166f3f80986a6f2b3b18e2",
+            "thumb_mtime": 1756927077,
+            "preview_hash": "98e02aaf76caea06d2166f3f80986a6f2b3b18e2",
+            "preview_mtime": 1756927077
         },
         {
             "name": "Tropical Island.mp4",
             "dirIndex": 0,
             "path": "videos\\Tropical Island.mp4",
+            "thumb_hash": "a76793021ffae30ca32fc4687b8369ca58cf2f36",
+            "thumb_mtime": 1755589459,
             "preview_hash": "a76793021ffae30ca32fc4687b8369ca58cf2f36",
             "preview_mtime": 1755589459
+        },
+        {
+            "name": "Violet Pond.mkv",
+            "dirIndex": 0,
+            "path": "videos\\Violet Pond.mkv",
+            "thumb_hash": "9fadf1b4a8880df0408d529414000233723458f2",
+            "thumb_mtime": 1757926844,
+            "preview_hash": "9fadf1b4a8880df0408d529414000233723458f2",
+            "preview_mtime": 1757926844
+        },
+        {
+            "name": "Wild Africa.mkv",
+            "dirIndex": 0,
+            "path": "videos\\Wild Africa.mkv",
+            "thumb_hash": "96a75c6c631ba97f7310c9aadfb62753f9454764",
+            "thumb_mtime": 1759740708,
+            "preview_hash": "96a75c6c631ba97f7310c9aadfb62753f9454764",
+            "preview_mtime": 1759740708
+        },
+        {
+            "name": "Wildflowers Meadow.mkv",
+            "dirIndex": 0,
+            "path": "videos\\Wildflowers Meadow.mkv",
+            "thumb_hash": "91983b040e60ce52801f463d23c33da7cab4d50d",
+            "thumb_mtime": 1757931065,
+            "preview_hash": "91983b040e60ce52801f463d23c33da7cab4d50d",
+            "preview_mtime": 1757931065
+        },
+        {
+            "name": "Window Farm.mkv",
+            "dirIndex": 0,
+            "path": "videos\\Window Farm.mkv",
+            "thumb_hash": "dcec495b2fce7e60933dc7b24071c463430175b5",
+            "thumb_mtime": 1757931167,
+            "preview_hash": "dcec495b2fce7e60933dc7b24071c463430175b5",
+            "preview_mtime": 1757931167
         }
     ],
     "available_backgrounds": [
