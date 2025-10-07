@@ -94,14 +94,6 @@ class AdminConfig {
             );
             $this->saveDashboards();
         }
-
-        // Normalize default profile name to "Default" if needed
-        if (isset($this->dashboards['default'])) {
-            if (($this->dashboards['default']['name'] ?? '') !== 'Default') {
-                $this->dashboards['default']['name'] = 'Default';
-                $this->saveDashboards();
-            }
-        }
     }
 
     private function loadScreens() {

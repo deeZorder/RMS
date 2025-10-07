@@ -290,7 +290,7 @@ private $baseDir;
         ?>
         <section id="video-management" class="admin-section">
             <div class="section-header">
-                <h3>ðŸŽ¬ Video Management</h3>
+                <h3>&#127916; Video Management</h3>
                 <p>Manage video titles, thumbnails, and metadata</p>
             </div>
             
@@ -308,7 +308,7 @@ private $baseDir;
                         <form method="post" style="display: inline-block;">
                             <input type="hidden" name="current_section" value="refresh-dashboards">
                             <button type="submit" class="btn btn-secondary" title="Push current video order to all dashboards">
-                                ðŸ”„ Refresh Screens
+                                &#128260; Refresh Screens
                             </button>
                         </form>
                     </div>
@@ -352,8 +352,8 @@ private $baseDir;
                 <?php endfor; ?>
                 
                 <?php if ($page < $paginationInfo['pages']): ?>
-                    <a href="?admin-panel=video-management&page=<?php echo $page + 1; ?>" class="btn secondary">Next â€º</a>
-                    <a href="?admin-panel=video-management&page=<?php echo $paginationInfo['pages']; ?>" class="btn secondary">Last Â»</a>
+                    <a href="?admin-panel=video-management&page=<?php echo $page + 1; ?>" class="btn secondary">Next &#10141;</a>
+                    <a href="?admin-panel=video-management&page=<?php echo $paginationInfo['pages']; ?>" class="btn secondary">Last &#10141;</a>
                 <?php endif; ?>
             </div>
         </div>
@@ -382,7 +382,7 @@ private $baseDir;
                         <label for="new_dashboard_name">Dashboard Name (optional)</label>
                         <input type="text" id="new_dashboard_name" name="new_dashboard_name" placeholder="e.g., Dashboard 3">
                     </div>
-                    <button type="submit" class="btn secondary">ï¼‹ Add Dashboard</button>
+                    <button type="submit" class="btn secondary">&#43; Add Dashboard</button>
                 </form>
             </div>
 
@@ -404,6 +404,7 @@ private $baseDir;
                     <div class="action-buttons">
                         <a href="<?php echo htmlspecialchars($dashUrl); ?>" class="btn secondary open-dashboard-link" data-url="<?php echo htmlspecialchars($dashUrl); ?>">Open Dashboard</a>
                         <a href="<?php echo htmlspecialchars($screenUrl); ?>" class="btn secondary open-screen-link" data-url="<?php echo htmlspecialchars($screenUrl); ?>">Open Screen</a>
+                        <button type="button" class="btn secondary rename-dashboard-btn" data-dashboard-id="<?php echo htmlspecialchars($id); ?>" data-current-name="<?php echo htmlspecialchars($name); ?>">&#9998; Rename</button>
                         <form method="post" action="admin.php" style="display:inline; margin-left:6px;">
                             <input type="hidden" name="current_section" value="refresh-profile">
                             <input type="hidden" name="dashboard_id" value="<?php echo htmlspecialchars($id); ?>">
@@ -414,7 +415,7 @@ private $baseDir;
                             <input type="hidden" name="current_section" value="screen-management">
                             <input type="hidden" name="sm_action" value="delete-dashboard">
                             <input type="hidden" name="dashboard_id" value="<?php echo htmlspecialchars($id); ?>">
-                            <button type="submit" class="btn secondary">ðŸ—‘ Delete</button>
+                            <button type="submit" class="btn secondary">&#128465; Delete</button>
                         </form>
                         <?php endif; ?>
                     </div>
@@ -452,7 +453,7 @@ private $baseDir;
         ?>
         <section id="system-status" class="admin-section">
             <div class="section-header">
-                <h3>ðŸ“Š System Status</h3>
+                <h3>&#128202; System Status</h3>
                 <p>Monitor system status and manage dashboard refresh</p>
             </div>
             
@@ -474,7 +475,7 @@ private $baseDir;
                 <div class="status-card">
                     <h4>ðŸŽ›ï¸ Dashboard Video Controls</h4>
                     <div id="dashboard-video-controls">
-                        <p>Loading dashboardsâ€¦</p>
+                        <p>Loading dashboards...</p>
                     </div>
                 </div>
                 
@@ -486,13 +487,13 @@ private $baseDir;
                             <button type="submit" class="btn secondary">ðŸ” Refresh Dashboards</button>
                         </form>
                         <button type="button" id="generate-thumbs-btn" class="btn btn-primary">ðŸ–¼ï¸ Generate Thumbnails</button>
-                        <button type="button" id="generate-previews-btn" class="btn btn-primary">ðŸŽ¬ Generate Previews</button>
+                        <button type="button" id="generate-previews-btn" class="btn btn-primary">&#127916; Generate Previews</button>
                         <button type="button" id="stop-processes-btn" class="btn btn-danger">â¹ï¸ Stop All Processes</button>
                         <button type="button" id="reindex-previews-btn" class="btn secondary">&#8635; Reindex Previews</button>
                         <button type="button" id="reindex-thumbs-btn" class="btn secondary">&#8635; Reindex Thumbnails</button>
                         <form method="post" action="admin.php" onsubmit="return confirm('Delete ALL generated thumbnails and custom titles? This cannot be undone.');" style="display:inline;">
                             <input type="hidden" name="current_section" value="clear-thumbs-titles" data-fixed>
-                            <button type="submit" class="btn secondary">ðŸ§¹ Clear Titles, Thumbnails & Previews</button>
+                            <button type="submit" class="btn secondary">&#129529; Clear Titles, Thumbnails &amp; Previews</button>
                         </form>
                         <form method="post" action="admin.php" onsubmit="return confirm('Trigger a refresh signal for all screens?');" style="display:inline; margin-left:6px;">
                             <input type="hidden" name="current_section" value="system-refresh-screens" data-fixed>
@@ -500,7 +501,7 @@ private $baseDir;
                         </form>
                         <form method="post" action="admin.php" onsubmit="return confirm('Reset configuration and dashboards to defaults?');" style="display:inline;">
                             <input type="hidden" name="current_section" value="system-reset" data-fixed>
-                            <button type="submit" class="btn secondary">ðŸ”„ Reset to Default</button>
+                            <button type="submit" class="btn secondary">&#128260; Reset to Default</button>
                         </form>
                         <!-- <button type="button" id="encode-vp9-btn" class="btn btn-primary">ðŸ§ª Encode â€œNew Zealand Tour.mp4â€ (VP9 1080p)</button> -->
                     </div>

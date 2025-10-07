@@ -682,8 +682,57 @@ function initializeDashboardControls() {
         });
     }
     
+    // Initialize rename dashboard buttons
+    initializeRenameDashboard();
+    
     // Render dashboard video controls
     renderDashboardVideoControls();
+}
+
+function initializeRenameDashboard() {
+    var renameButtons = document.querySelectorAll('.rename-dashboard-btn');
+    renameButtons.forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var dashboardId = btn.getAttribute('data-dashboard-id');
+            var currentName = btn.getAttribute('data-current-name');
+            
+            var newName = prompt('Enter new name for "' + currentName + '":', currentName);
+            
+            if (newName !== null && newName.trim() !== '' && newName.trim() !== currentName) {
+                // Create and submit form
+                var form = document.createElement('form');
+                form.method = 'POST';
+                form.action = 'admin.php';
+                
+                var sectionInput = document.createElement('input');
+                sectionInput.type = 'hidden';
+                sectionInput.name = 'current_section';
+                sectionInput.value = 'screen-management';
+                form.appendChild(sectionInput);
+                
+                var actionInput = document.createElement('input');
+                actionInput.type = 'hidden';
+                actionInput.name = 'sm_action';
+                actionInput.value = 'rename-dashboard';
+                form.appendChild(actionInput);
+                
+                var idInput = document.createElement('input');
+                idInput.type = 'hidden';
+                idInput.name = 'dashboard_id';
+                idInput.value = dashboardId;
+                form.appendChild(idInput);
+                
+                var nameInput = document.createElement('input');
+                nameInput.type = 'hidden';
+                nameInput.name = 'new_name';
+                nameInput.value = newName.trim();
+                form.appendChild(nameInput);
+                
+                document.body.appendChild(form);
+                form.submit();
+            }
+        });
+    });
 }
 
 // Modal functionality
@@ -1093,7 +1142,7 @@ function initializeModals() {
         vp9Modal.className = 'modal';
         vp9Modal.style.display = 'none';
         vp9Modal.innerHTML = '<div class="modal-content">\
-            <div class="modal-header"><h3>🎞️ Encoding to VP9 (single file)</h3></div>\
+            <div class="modal-header"><h3>&#127902;&#65039; Encoding to VP9 (single file)</h3></div>\
             <div class="modal-body">\
                 <div class="preview-animation"><div class="spinner"></div></div>\
                 <div class="vp9-status">Starting…</div>\
@@ -1368,14 +1417,9 @@ function renderDashboardVideoControls() {
     
     Object.keys(profiles).forEach((id) => {
         const d = profiles[id] || {};
-        const name = id === 'default' ? 'Default' : (d.name || id);
+        const name = d.name || id;
+        // Always use profile parameter for API calls to ensure correct profile data is retrieved
         let query = 'profile=' + encodeURIComponent(id);
-        const m = id.match(/^dashboard(\d+)$/);
-        if (id === 'default') {
-            query = 'd=0';
-        } else if (m) {
-            query = 'd=' + m[1];
-        }
         html += '<div style="border:1px solid #333; background:#1f1f1f; border-radius:8px; padding:12px;">';
         html += '<div style="color:#4ecdc4; font-weight:600; margin-bottom:6px;">' + escapeHtml(name) + '</div>';
         html += '<div style="display:flex; gap:8px; flex-wrap:wrap;">'
@@ -1786,56 +1830,135 @@ function checkRunningProcesses() {
         stopProcessesBtn.className = 'btn btn-secondary';
     }
 }
-    // Normalize icons/text in System Actions (avoid mojibake by using entities)
-    (function normalizeSystemActionIcons(){
-        function setHTML(selector, html){ var el=document.querySelector(selector); if (el) { el.innerHTML = html; } }
-        // System Actions card header (anchor via a known child button)
+    // Normalize all emoji icons across entire admin page (avoid mojibake by using entities)
+    (function normalizeAllEmojis(){
+        function setHTML(selector, html){ 
+            var el = document.querySelector(selector); 
+            if (el) { el.innerHTML = html; } 
+        }
+        function setHTMLAll(selector, html){
+            var els = document.querySelectorAll(selector);
+            els.forEach(function(el){ el.innerHTML = html; });
+        }
+        
         try {
-            // System Status section title
-            var sysStatusTitle = document.querySelector('#system-status .section-header h3');
-            if (sysStatusTitle) { sysStatusTitle.innerHTML = '&#129517; System Status'; }
-
-            // Directory Status (first status card under System Status)
-            var dirStatusH4 = document.querySelector('#system-status .status-cards .status-card h4');
-            if (dirStatusH4) { dirStatusH4.innerHTML = '&#128193; Directory Status'; }
-
-            var thumbsBtn = document.getElementById('generate-thumbs-btn');
-            if (thumbsBtn) {
-                var sysCard = thumbsBtn.closest('.status-card');
-                if (sysCard) {
-                    var h4 = sysCard.querySelector('h4');
-                    if (h4) h4.innerHTML = '&#9881;&#65039; System Actions';
-                }
-            }
-            // Dashboard Video Controls header
-            var dvc = document.getElementById('dashboard-video-controls');
-            if (dvc) {
-                var dvcCard = dvc.closest('.status-card');
-                if (dvcCard) {
-                    var h4b = dvcCard.querySelector('h4');
-                    if (h4b) h4b.innerHTML = '&#127899;&#65039; Dashboard Video Controls';
-                }
-            }
-            // Buttons inside System Actions
+            // Navigation Icons
+            var navLinks = document.querySelectorAll('.nav-link');
+            navLinks.forEach(function(link){
+                var section = link.getAttribute('data-section');
+                var icon = link.querySelector('.nav-icon');
+                if (!icon) return;
+                if (section === 'directory-config') icon.innerHTML = '&#128193;';
+                if (section === 'video-management') icon.innerHTML = '&#127916;';
+                if (section === 'dashboard-settings') icon.innerHTML = '&#9881;&#65039;';
+                if (section === 'screen-management') icon.innerHTML = '&#128421;&#65039;';
+                if (section === 'system-status') icon.innerHTML = '&#128202;';
+            });
+            
+            // Section Headers
+            setHTML('#directory-config .section-header h3', '&#128193; Directory Configuration');
+            setHTML('#video-management .section-header h3', '&#127916; Video Management');
+            setHTML('#dashboard-settings .section-header h3', '&#9881;&#65039; Dashboard Settings');
+            setHTML('#screen-management .section-header h3', '&#128421;&#65039; Screen Management');
+            setHTML('#system-status .section-header h3', '&#128202; System Status');
+            
+            // System Status section cards
+            var statusCards = document.querySelectorAll('#system-status .status-card h4');
+            if (statusCards.length >= 1) statusCards[0].innerHTML = '&#128193; Directory Status';
+            if (statusCards.length >= 2) statusCards[1].innerHTML = '&#127899;&#65039; Dashboard Video Controls';
+            if (statusCards.length >= 3) statusCards[2].innerHTML = '&#9881;&#65039; System Actions';
+            
+            // Buttons in System Actions
             setHTML('#generate-thumbs-btn', '&#128444;&#65039; Generate Thumbnails');
             setHTML('#generate-previews-btn', '&#127916; Generate Previews');
             setHTML('#stop-processes-btn', '&#9209;&#65039; Stop All Processes');
             setHTML('#reindex-previews-btn', '&#8635; Reindex Previews');
-            // Hidden-field anchored buttons
-            var refreshDashBtnInput = document.querySelector('input[name="current_section"][value="system-refresh"]');
-            if (refreshDashBtnInput) {
-                var btn1 = refreshDashBtnInput.closest('form')?.querySelector('button');
-                if (btn1) btn1.innerHTML = '&#128257; Refresh Dashboards';
+            setHTML('#reindex-thumbs-btn', '&#8635; Reindex Thumbnails');
+            
+            // Forms with hidden inputs
+            var refreshDashBtn = document.querySelector('input[name="current_section"][value="system-refresh"]');
+            if (refreshDashBtn) {
+                var btn1 = refreshDashBtn.closest('form');
+                if (btn1) {
+                    var b = btn1.querySelector('button');
+                    if (b) b.innerHTML = '&#128276; Refresh Dashboards';
+                }
             }
-            var clearBtnInput = document.querySelector('input[name="current_section"][value="clear-thumbs-titles"]');
-            if (clearBtnInput) {
-                var btn2 = clearBtnInput.closest('form')?.querySelector('button');
-                if (btn2) btn2.innerHTML = '&#129531; Clear Titles, Thumbnails &amp; Previews';
+            
+            var refreshScreensBtn = document.querySelector('input[name="current_section"][value="system-refresh-screens"]');
+            if (refreshScreensBtn) {
+                var btn2 = refreshScreensBtn.closest('form');
+                if (btn2) {
+                    var b = btn2.querySelector('button');
+                    if (b) b.innerHTML = '&#128260; Refresh Screens';
+                }
             }
-            var resetBtnInput = document.querySelector('input[name="current_section"][value="system-reset"]');
-            if (resetBtnInput) {
-                var btn3 = resetBtnInput.closest('form')?.querySelector('button');
-                if (btn3) btn3.innerHTML = '&#128260; Reset to Default';
+            
+            var clearBtn = document.querySelector('input[name="current_section"][value="clear-thumbs-titles"]');
+            if (clearBtn) {
+                var btn3 = clearBtn.closest('form');
+                if (btn3) {
+                    var b = btn3.querySelector('button');
+                    if (b) b.innerHTML = '&#129529; Clear Titles, Thumbnails &amp; Previews';
+                }
             }
-        } catch(_) {}
+            
+            var resetBtn = document.querySelector('input[name="current_section"][value="system-reset"]');
+            if (resetBtn) {
+                var btn4 = resetBtn.closest('form');
+                if (btn4) {
+                    var b = btn4.querySelector('button');
+                    if (b) b.innerHTML = '&#128260; Reset to Default';
+                }
+            }
+            
+            // Video Management refresh button
+            var vmRefreshBtn = document.querySelector('#video-management input[name="current_section"][value="refresh-dashboards"]');
+            if (vmRefreshBtn) {
+                var vmForm = vmRefreshBtn.closest('form');
+                if (vmForm) {
+                    var b = vmForm.querySelector('button');
+                    if (b) b.innerHTML = '&#128260; Refresh Screens';
+                }
+            }
+            
+            // Screen Management add dashboard button
+            var addDashBtn = document.querySelector('#screen-management input[name="sm_action"][value="add-dashboard"]');
+            if (addDashBtn) {
+                var addForm = addDashBtn.closest('form');
+                if (addForm) {
+                    var b = addForm.querySelector('button[type="submit"]');
+                    if (b) b.innerHTML = '&#43; Add Dashboard';
+                }
+            }
+            
+            // Delete buttons in Screen Management
+            var deleteButtons = document.querySelectorAll('#screen-management input[name="sm_action"][value="delete-dashboard"]');
+            deleteButtons.forEach(function(input){
+                var form = input.closest('form');
+                if (form) {
+                    var b = form.querySelector('button[type="submit"]');
+                    if (b) b.innerHTML = '&#128465; Delete';
+                }
+            });
+            
+            // Rename buttons in Screen Management
+            var renameButtons = document.querySelectorAll('.rename-dashboard-btn');
+            renameButtons.forEach(function(btn){
+                if (btn.textContent.indexOf('Rename') !== -1) {
+                    btn.innerHTML = '&#9998; Rename';
+                }
+            });
+            
+            // Directory Configuration save button
+            var dirSaveBtn = document.querySelector('#directory-config button.btn-with-icon');
+            if (dirSaveBtn) dirSaveBtn.innerHTML = '&#128190; Save Configuration';
+            
+            // Dashboard Settings save button
+            var dashSaveBtn = document.querySelector('#dashboard-settings button.btn-with-icon');
+            if (dashSaveBtn) dashSaveBtn.innerHTML = '&#128190; Save Configuration';
+            
+        } catch(e) {
+            console.error('Emoji normalization error:', e);
+        }
     })();

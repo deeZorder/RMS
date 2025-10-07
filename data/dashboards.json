@@ -1,14 +1,14 @@
 {
     "default": {
         "id": "default",
-        "name": "Default",
+        "name": "Palliatieve",
         "rows": 2,
         "clipsPerRow": 4,
         "dashboardBackground": "assets/backgrounds/silver.jpg"
     },
     "dashboard1": {
         "id": "dashboard1",
-        "name": "Dashboard 1",
+        "name": "De Dam",
         "rows": 2,
         "clipsPerRow": 4,
         "dashboardBackground": "assets/backgrounds/silver.jpg"

@@ -360,23 +360,23 @@ class AdminTemplate {
             </div>
             <ul class="sidebar-nav">
                 <li><a href="#directory-config" class="nav-link active" data-section="directory-config">
-                    <span class="nav-icon">📁</span>
+                    <span class="nav-icon">&#128193;</span>
                     <span class="nav-text">Directory Configuration</span>
                 </a></li>
                 <li><a href="#video-management" class="nav-link" data-section="video-management">
-                    <span class="nav-icon">🎬</span>
+                    <span class="nav-icon">&#127916;</span>
                     <span class="nav-text">Video Management</span>
                 </a></li>
                 <li><a href="#dashboard-settings" class="nav-link" data-section="dashboard-settings">
-                    <span class="nav-icon">⚙️</span>
+                    <span class="nav-icon">&#9881;&#65039;</span>
                     <span class="nav-text">Dashboard Settings</span>
                 </a></li>
                 <li><a href="#screen-management" class="nav-link" data-section="screen-management">
-                    <span class="nav-icon">🖥️</span>
+                    <span class="nav-icon">&#128421;&#65039;</span>
                     <span class="nav-text">Screen Management</span>
                 </a></li>
                 <li><a href="#system-status" class="nav-link" data-section="system-status">
-                    <span class="nav-icon">📊</span>
+                    <span class="nav-icon">&#128202;</span>
                     <span class="nav-text">System Status</span>
                 </a></li>
             </ul>
@@ -391,13 +391,13 @@ class AdminTemplate {
         ?>
         <section id="directory-config" class="admin-section active">
             <div class="section-header">
-                <h3>📁 Directory Configuration</h3>
+                <h3>&#128193; Directory Configuration</h3>
                 <p>Configure video directories and manage file locations</p>
                 <div style="font-size: 11px; color: #666; font-style: italic; margin-top: 5px;">
                     <?php if ($needsAdminScan): ?>
-                        🔄 Scanning directories for changes...
+                        &#128260; Scanning directories for changes...
                     <?php else: ?>
-                        ✅ Using cached data (<?php echo round((time() - ($adminCache['last_scan'] ?? 0)) / 60, 1); ?>m old)
+                        &#9989; Using cached data (<?php echo round((time() - ($adminCache['last_scan'] ?? 0)) / 60, 1); ?>m old)
                     <?php endif; ?>
                 </div>
             </div>
@@ -420,9 +420,9 @@ class AdminTemplate {
                     <?php $this->renderDirectoryBrowser(); ?>
                     
                     <div class="form-actions">
-                        <button type="submit" class="btn primary btn-with-icon">💾 Save Configuration</button>
+                        <button type="submit" class="btn primary btn-with-icon">&#128190; Save Configuration</button>
                         <?php if (!empty($flash) && ($activeSection === 'directory-config' || $activeSection === '')): ?>
-                            <span id="global-flash-alert" class="alert success" style="margin:0; padding:10px 14px; line-height:1; display:inline-flex; align-items:center; gap:8px;">✅ <?php echo htmlspecialchars($flash['message'] ?? ''); ?></span>
+                            <span id="global-flash-alert" class="alert success" style="margin:0; padding:10px 14px; line-height:1; display:inline-flex; align-items:center; gap:8px;">&#9989; <?php echo htmlspecialchars($flash['message'] ?? ''); ?></span>
                         <?php endif; ?>
                         <small class="hint hint-right">Save your directory configuration to apply changes</small>
                     </div>
@@ -444,15 +444,15 @@ class AdminTemplate {
                     <div class="radio-group">
                         <label class="radio-option">
                             <input type="radio" name="browser-type" value="server" checked>
-                            <span>🖥️ Server Directories</span>
+                            <span>&#128421;&#65039; Server Directories</span>
                         </label>
                         <label class="radio-option">
                             <input type="radio" name="browser-type" value="client" id="client-browser-radio">
-                            <span>💻 Local Client Directories</span>
+                            <span>&#128187; Local Client Directories</span>
                         </label>
                     </div>
                     <div id="client-browser-warning" style="display: none; margin-top: 8px; padding: 8px; background: #2a1a00; border: 1px solid #664400; border-radius: 4px; color: #ffaa00; font-size: 12px;">
-                        ⚠️ Client directory browsing requires a modern browser with File System Access API support (Chrome/Edge 86+). Selected directories will need to be accessible to the server.
+                        &#9888;&#65039; Client directory browsing requires a modern browser with File System Access API support (Chrome/Edge 86+). Selected directories will need to be accessible to the server.
                     </div>
                 </div>
                 
@@ -473,7 +473,7 @@ class AdminTemplate {
                         <p style="margin: 10px 0; color: #ccc; font-size: 14px;">
                             Click "Browse Local Folders" to select a folder from your computer using your browser's file picker.
                         </p>
-                        <button type="button" id="browse-client-btn" class="btn primary">📁 Browse Local Folders</button>
+                        <button type="button" id="browse-client-btn" class="btn primary">&#128193; Browse Local Folders</button>
                         <input type="file" id="client-file-input" webkitdirectory directory multiple style="display: none;">
                     </div>
                     <div id="client-selected-info" style="display: none; margin-top: 15px; padding: 10px; background: #1a2a1a; border: 1px solid #4ecdc4; border-radius: 4px;">
@@ -503,7 +503,7 @@ class AdminTemplate {
         <div id="importing-modal" class="modal" style="display: none;">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h3>🔄 Importing File Data</h3>
+                    <h3>&#128260; Importing File Data</h3>
                 </div>
                 <div class="modal-body">
                     <div class="importing-animation">
@@ -522,7 +522,7 @@ class AdminTemplate {
         <div id="thumbnail-modal" class="modal" style="display: none;">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h3>🖼️ Generating Thumbnails</h3>
+                    <h3>&#128444;&#65039; Generating Thumbnails</h3>
                 </div>
                 <div class="modal-body">
                     <div class="thumbnail-animation">
@@ -559,7 +559,7 @@ class AdminTemplate {
         <div id="preview-modal" class="modal" style="display: none;">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h3>🎬 Generating Previews</h3>
+                    <h3>&#127916; Generating Previews</h3>
                 </div>
                 <div class="modal-body">
                     <div class="preview-animation">
@@ -647,7 +647,7 @@ class AdminTemplate {
         ?>
         <section id="dashboard-settings" class="admin-section">
             <div class="section-header">
-                <h3>⚙️ Dashboard Settings</h3>
+                <h3>&#9881;&#65039; Dashboard Settings</h3>
                 <p>Choose a dashboard profile to customize its layout and background</p>
             </div>
             
@@ -660,7 +660,7 @@ class AdminTemplate {
                             <?php 
                             foreach ($dashboards as $id => $d) {
                                 $sel = ($id === $selectedDashboard) ? 'selected' : '';
-                                $label = ($id === 'default') ? 'Default' : ($d['name'] ?? $id);
+                                $label = $d['name'] ?? $id;
                                 echo '<option value="' . htmlspecialchars($id) . '" ' . $sel . '>' . htmlspecialchars($label) . '</option>';
                             }
                             ?>
@@ -696,7 +696,7 @@ class AdminTemplate {
                 <div class="form-actions">
                     <button type="submit" class="btn secondary btn-with-icon">Save Configuration</button>
                     <?php if (!empty($flash) && $activeSection === 'dashboard-settings'): ?>
-                        <span id="global-flash-alert" class="alert success" style="margin:0; padding:10px 14px; line-height:1; display:inline-flex; align-items:center; gap:8px;">✅ <?php echo htmlspecialchars($flash['message'] ?? ''); ?></span>
+                        <span id="global-flash-alert" class="alert success" style="margin:0; padding:10px 14px; line-height:1; display:inline-flex; align-items:center; gap:8px;">&#9989; <?php echo htmlspecialchars($flash['message'] ?? ''); ?></span>
                     <?php endif; ?>
                     <small class="hint hint-right">Changes save automatically and refresh the dashboard</small>
                 </div>

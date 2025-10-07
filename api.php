@@ -1125,7 +1125,7 @@ function getVolume() {
 
 function setVolume() {
     try {
-        $profileId = $_POST['profile'] ?? 'default';
+        $profileId = $_POST['profile'] ?? $_GET['profile'] ?? 'default';
         $volume = (int)($_POST['volume'] ?? 100);
 
         if ($volume < 0 || $volume > 100) {
@@ -1195,7 +1195,7 @@ function getMuteState() {
 
 function toggleMute() {
     try {
-        $profileId = $_POST['profile'] ?? 'default';
+        $profileId = $_POST['profile'] ?? $_GET['profile'] ?? 'default';
         $stateDir = __DIR__ . '/data/profiles/' . preg_replace('/[^a-zA-Z0-9_\-]/', '', $profileId);
         $stateFile = $stateDir . '/state.json';
         if (!is_dir($stateDir)) {
@@ -1234,7 +1234,7 @@ function toggleMute() {
 // Video control functions for direct playback (no HLS)
 function playVideo() {
     try {
-        $profileId = $_POST['profile'] ?? 'default';
+        $profileId = $_POST['profile'] ?? $_GET['profile'] ?? 'default';
 
         // Simple fallback implementation without state manager
         $statePath = __DIR__ . '/data/profiles/' . preg_replace('/[^a-zA-Z0-9_\-]/', '', $profileId);
@@ -1264,7 +1264,7 @@ function playVideo() {
 
 function pauseVideo() {
     try {
-        $profileId = $_POST['profile'] ?? 'default';
+        $profileId = $_POST['profile'] ?? $_GET['profile'] ?? 'default';
 
         // Simple fallback implementation without state manager
         $statePath = __DIR__ . '/data/profiles/' . preg_replace('/[^a-zA-Z0-9_\-]/', '', $profileId);
@@ -1294,7 +1294,7 @@ function pauseVideo() {
 
 function stopVideo() {
     try {
-        $profileId = $_POST['profile'] ?? 'default';
+        $profileId = $_POST['profile'] ?? $_GET['profile'] ?? 'default';
 
         // Simple fallback implementation without state manager
         $statePath = __DIR__ . '/data/profiles/' . preg_replace('/[^a-zA-Z0-9_\-]/', '', $profileId);
@@ -1324,7 +1324,7 @@ function stopVideo() {
 
 function setCurrentVideo() {
     try {
-        $profileId = $_POST['profile'] ?? 'default';
+        $profileId = $_POST['profile'] ?? $_GET['profile'] ?? 'default';
         $filename = $_POST['filename'] ?? '';
         $dirIndex = (int)($_POST['dirIndex'] ?? 0);
 
@@ -1360,7 +1360,7 @@ function setCurrentVideo() {
 
 function clearCurrentVideo() {
     try {
-        $profileId = $_POST['profile'] ?? 'default';
+        $profileId = $_POST['profile'] ?? $_GET['profile'] ?? 'default';
 
         // Simple fallback implementation without state manager
         $statePath = __DIR__ . '/data/profiles/' . preg_replace('/[^a-zA-Z0-9_\-]/', '', $profileId);
@@ -1672,7 +1672,7 @@ function getLoopMode() {
     }
 }function setLoopMode() {
     try {
-        $profileId = $_POST['profile'] ?? 'default';
+        $profileId = $_POST['profile'] ?? $_GET['profile'] ?? 'default';
         $loop = $_POST['loopMode'] ?? ($_POST['loop'] ?? 'off');
         if (!in_array($loop, ['on', 'off'])) { throw new Exception('Invalid loop mode'); }
         $profileDir = __DIR__ . '/data/profiles/' . preg_replace('/[^a-zA-Z0-9_\-]/', '', $profileId);
@@ -1718,7 +1718,7 @@ function getLoopMode() {
     }
 }function setPlayAllMode() {
     try {
-        $profileId = $_POST['profile'] ?? 'default';
+        $profileId = $_POST['profile'] ?? $_GET['profile'] ?? 'default';
         $playAll = $_POST['playAllMode'] ?? ($_POST['play_all'] ?? 'off');
         if (!in_array($playAll, ['on', 'off'])) { throw new Exception('Invalid play all mode'); }
         $profileDir = __DIR__ . '/data/profiles/' . preg_replace('/[^a-zA-Z0-9_\-]/', '', $profileId);
@@ -1768,7 +1768,7 @@ function getLoopMode() {
 
 function setExternalAudioModeEndpoint() {
     try {
-        $profileId = $_POST['profile'] ?? 'default';
+        $profileId = $_POST['profile'] ?? $_GET['profile'] ?? 'default';
         $external = $_POST['external'] ?? 'off';
 
         if (!in_array($external, ['on', 'off'])) {

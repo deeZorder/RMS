@@ -1,17 +1,17 @@
 {
     "currentVideo": {
-        "filename": "Central Park.mkv",
+        "filename": "",
         "dirIndex": 0
     },
-    "playbackState": "play",
+    "playbackState": "stop",
     "volume": 45,
     "muted": false,
-    "loopMode": "on",
+    "loopMode": "off",
     "playAllMode": "off",
     "externalAudioMode": "off",
-    "lastControlChange": 1759741235,
+    "lastControlChange": 1759845328,
     "lastConfigCheck": 0,
     "lastScan": 1759741043,
-    "lastRefreshTrigger": 1759406309,
+    "lastRefreshTrigger": 1759844139,
     "refreshRequested": false
 }

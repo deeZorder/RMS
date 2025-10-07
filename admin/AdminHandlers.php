@@ -54,7 +54,6 @@ $currentSection = $_POST['current_section'] ?? 'directory-config';
 
     private function handleDashboardSettings() {
         $dashboardId = trim((string)($_POST['dashboard_id'] ?? 'default')) ?: 'default';
-        $dashboardName = trim((string)($_POST['dashboard_name'] ?? '')) ?: ($dashboardId === 'default' ? 'Default' : ucfirst($dashboardId));
         $rows = (int)($_POST['rows'] ?? 2);
         $clipsPerRow = (int)($_POST['clipsPerRow'] ?? 5);
         $dashboardBackground = isset($_POST['dashboardBackground']) ? trim((string)$_POST['dashboardBackground']) : '';
@@ -65,6 +64,8 @@ $currentSection = $_POST['current_section'] ?? 'directory-config';
         $dashboards = $this->config->getDashboards();
         
         if (!isset($dashboards[$dashboardId])) {
+            // New dashboard - set default name
+            $dashboardName = $dashboardId === 'default' ? 'Default' : ucfirst($dashboardId);
             $dashboards[$dashboardId] = array(
                 'id' => $dashboardId,
                 'name' => $dashboardName,
@@ -73,7 +74,7 @@ $currentSection = $_POST['current_section'] ?? 'directory-config';
                 'dashboardBackground' => ($dashboardBackground === 'none') ? '' : $dashboardBackground,
             );
         } else {
-            $dashboards[$dashboardId]['name'] = $dashboardName;
+            // Existing dashboard - preserve the name, only update other settings
             $dashboards[$dashboardId]['rows'] = $rows;
             $dashboards[$dashboardId]['clipsPerRow'] = $clipsPerRow;
             $dashboards[$dashboardId]['dashboardBackground'] = ($dashboardBackground === 'none') ? '' : $dashboardBackground;
@@ -570,6 +571,8 @@ $currentSection = $_POST['current_section'] ?? 'directory-config';
         switch ($smAction) {
             case 'add-dashboard':
                 return $this->handleAddDashboard();
+            case 'rename-dashboard':
+                return $this->handleRenameDashboard();
             case 'add-screen':
                 return $this->handleAddScreen();
             case 'delete-screen':
@@ -611,6 +614,30 @@ $currentSection = $_POST['current_section'] ?? 'directory-config';
         }
         
         $this->triggerDashboardRefresh('default');
+        header('Location: admin.php?admin-panel=screen-management#screen-management');
+        exit;
+    }
+
+    private function handleRenameDashboard() {
+        $dashboardId = trim((string)($_POST['dashboard_id'] ?? ''));
+        $newName = trim((string)($_POST['new_name'] ?? ''));
+        
+        if ($dashboardId === '' || $newName === '') {
+            $_SESSION['flash'] = ['type' => 'error', 'message' => 'Dashboard ID and name are required'];
+            header('Location: admin.php?admin-panel=screen-management#screen-management');
+            exit;
+        }
+        
+        $dashboards = $this->config->getDashboards();
+        if (isset($dashboards[$dashboardId])) {
+            $dashboards[$dashboardId]['name'] = $newName;
+            $this->config->setDashboard($dashboardId, $dashboards[$dashboardId]);
+            $this->config->saveDashboards();
+            $_SESSION['flash'] = ['type' => 'success', 'message' => 'Dashboard renamed successfully'];
+        } else {
+            $_SESSION['flash'] = ['type' => 'error', 'message' => 'Dashboard not found'];
+        }
+        
         header('Location: admin.php?admin-panel=screen-management#screen-management');
         exit;
     }

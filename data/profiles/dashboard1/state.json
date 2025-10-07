@@ -1,15 +1,15 @@
 {
     "currentVideo": {
-        "filename": "Wild Africa.mkv",
+        "filename": "Alien Worlds.mkv",
         "dirIndex": 0
     },
     "playbackState": "play",
-    "volume": 5,
+    "volume": 50,
     "muted": false,
     "loopMode": "off",
     "playAllMode": "off",
     "externalAudioMode": "off",
-    "lastControlChange": 1759741431,
+    "lastControlChange": 1759848179,
     "lastConfigCheck": 0,
-    "lastScan": 1759741229
+    "lastScan": 1759844159
 }
