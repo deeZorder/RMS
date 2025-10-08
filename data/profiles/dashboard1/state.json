@@ -1,15 +1,15 @@
 {
     "currentVideo": {
-        "filename": "Alien Worlds.mkv",
+        "filename": "",
         "dirIndex": 0
     },
-    "playbackState": "play",
-    "volume": 50,
+    "playbackState": "stop",
+    "volume": 35,
     "muted": false,
     "loopMode": "off",
     "playAllMode": "off",
     "externalAudioMode": "off",
-    "lastControlChange": 1759848179,
+    "lastControlChange": 1759910365,
     "lastConfigCheck": 0,
     "lastScan": 1759844159
 }

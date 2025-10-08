@@ -1,17 +1,17 @@
 {
     "currentVideo": {
-        "filename": "",
+        "filename": "Blue Aquarium.mp4",
         "dirIndex": 0
     },
     "playbackState": "stop",
-    "volume": 45,
+    "volume": 55,
     "muted": false,
     "loopMode": "off",
     "playAllMode": "off",
     "externalAudioMode": "off",
-    "lastControlChange": 1759845328,
+    "lastControlChange": 1759909098,
     "lastConfigCheck": 0,
     "lastScan": 1759741043,
-    "lastRefreshTrigger": 1759844139,
+    "lastRefreshTrigger": 1759848491,
     "refreshRequested": false
 }

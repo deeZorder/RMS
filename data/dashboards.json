@@ -12,5 +12,12 @@
         "rows": 2,
         "clipsPerRow": 4,
         "dashboardBackground": "assets/backgrounds/silver.jpg"
+    },
+    "dashboard2": {
+        "id": "dashboard2",
+        "name": "De Stap",
+        "rows": 2,
+        "clipsPerRow": 4,
+        "dashboardBackground": "assets/backgrounds/silver.jpg"
     }
 }
